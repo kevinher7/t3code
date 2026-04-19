@@ -278,6 +278,7 @@ const makeClaudeTextGeneration = Effect.gen(function* () {
     const { prompt, outputSchema } = buildBranchNamePrompt({
       message: input.message,
       attachments: input.attachments,
+      username: input.username,
     });
 
     if (input.modelSelection.provider !== "claudeAgent") {

@@ -53,6 +53,7 @@ export interface BranchNameGenerationInput {
   cwd: string;
   message: string;
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
+  username?: string | undefined;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
 }
