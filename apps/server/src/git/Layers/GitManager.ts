@@ -1245,6 +1245,12 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
     });
     const rangeContext = yield* gitCore.readRangeContext(cwd, baseBranch);
 
+    const templatePath = path.join(cwd, ".github", "pull_request_template.md");
+    const prTemplate = yield* fileSystem
+      .readFileString(templatePath)
+      .pipe(Effect.option)
+      .pipe(Effect.map(Option.getOrUndefined));
+
     const generated = yield* textGeneration.generatePrContent({
       cwd,
       baseBranch,
@@ -1252,6 +1258,7 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
       commitSummary: limitContext(rangeContext.commitSummary, 20_000),
       diffSummary: limitContext(rangeContext.diffSummary, 20_000),
       diffPatch: limitContext(rangeContext.diffPatch, 60_000),
+      prTemplate,
       modelSelection,
     });
 

@@ -249,6 +249,7 @@ const makeClaudeTextGeneration = Effect.gen(function* () {
       commitSummary: input.commitSummary,
       diffSummary: input.diffSummary,
       diffPatch: input.diffPatch,
+      prTemplate: input.prTemplate,
     });
 
     if (input.modelSelection.provider !== "claudeAgent") {

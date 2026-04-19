@@ -79,6 +79,7 @@ export interface PrContentPromptInput {
   commitSummary: string;
   diffSummary: string;
   diffPatch: string;
+  prTemplate?: string | undefined;
 }
 
 export function buildPrContentPrompt(input: PrContentPromptInput) {
@@ -102,6 +103,9 @@ export function buildPrContentPrompt(input: PrContentPromptInput) {
     "",
     "Diff patch:",
     limitSection(input.diffPatch, 40_000),
+    ...(input.prTemplate
+      ? ["", "PR Template (follow this structure for the body):", input.prTemplate]
+      : []),
   ].join("\n");
 
   const outputSchema = Schema.Struct({

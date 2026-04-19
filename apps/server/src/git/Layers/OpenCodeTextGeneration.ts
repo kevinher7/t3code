@@ -340,6 +340,7 @@ const makeOpenCodeTextGeneration = Effect.gen(function* () {
       commitSummary: input.commitSummary,
       diffSummary: input.diffSummary,
       diffPatch: input.diffPatch,
+      prTemplate: input.prTemplate,
     });
     const generated = yield* runOpenCodeJson({
       operation: "generatePrContent",

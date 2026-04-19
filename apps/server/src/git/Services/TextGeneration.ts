@@ -40,6 +40,7 @@ export interface PrContentGenerationInput {
   commitSummary: string;
   diffSummary: string;
   diffPatch: string;
+  prTemplate?: string | undefined;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
 }
