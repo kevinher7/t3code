@@ -1245,11 +1245,20 @@ export const makeGitManager = Effect.fn("makeGitManager")(function* () {
     });
     const rangeContext = yield* gitCore.readRangeContext(cwd, baseBranch);
 
-    const templatePath = path.join(cwd, ".github", "pull_request_template.md");
-    const prTemplate = yield* fileSystem
-      .readFileString(templatePath)
-      .pipe(Effect.option)
-      .pipe(Effect.map(Option.getOrUndefined));
+    const githubDir = path.join(cwd, ".github");
+    const prTemplate = yield* Effect.gen(function* () {
+      const entries = yield* fileSystem
+        .readDirectory(githubDir, { recursive: false })
+        .pipe(Effect.option);
+      const match = Option.getOrElse(entries, () => [] as Array<string>).find(
+        (name) => name.toLowerCase() === "pull_request_template.md",
+      );
+      if (!match) return undefined;
+      return yield* fileSystem
+        .readFileString(path.join(githubDir, match))
+        .pipe(Effect.option)
+        .pipe(Effect.map(Option.getOrUndefined));
+    });
 
     const generated = yield* textGeneration.generatePrContent({
       cwd,
