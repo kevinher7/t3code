@@ -509,6 +509,8 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           );
       };
 
+      const availableEditors = resolveAvailableEditors();
+
       const loadServerConfig = Effect.gen(function* () {
         const keybindingsConfig = yield* keybindings.loadConfigState;
         const providers = yield* providerRegistry.getProviders;
@@ -524,7 +526,7 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           keybindings: keybindingsConfig.keybindings,
           issues: keybindingsConfig.issues,
           providers,
-          availableEditors: resolveAvailableEditors(),
+          availableEditors,
           observability: {
             logsDirectoryPath: config.logsDir,
             localTracingEnabled: true,

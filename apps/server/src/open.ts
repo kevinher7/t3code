@@ -184,10 +184,6 @@ export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
 
 export const launchDetached = (launch: EditorLaunch) =>
   Effect.gen(function* () {
-    if (!isCommandAvailable(launch.command)) {
-      return yield* new OpenError({ message: `Editor command not found: ${launch.command}` });
-    }
-
     yield* Effect.callback<void, OpenError>((resume) => {
       let child;
       try {
