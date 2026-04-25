@@ -125,6 +125,25 @@ export function resolveAvailableEditors(
   return available;
 }
 
+export function resolveEditorCommandMap(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): ReadonlyMap<EditorId, string> {
+  const map = new Map<EditorId, string>();
+
+  for (const editor of EDITORS) {
+    if (editor.commands === null) {
+      const command = fileManagerCommandForPlatform(platform);
+      if (isCommandAvailable(command, { platform, env })) map.set(editor.id, command);
+    } else {
+      const command = resolveAvailableCommand(editor.commands, { platform, env });
+      if (command !== null) map.set(editor.id, command);
+    }
+  }
+
+  return map;
+}
+
 /**
  * OpenShape - Service API for browser and editor launch actions.
  */
@@ -155,6 +174,7 @@ export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
   input: OpenInEditorInput,
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
+  resolvedCommands: ReadonlyMap<EditorId, string> = new Map(),
 ): Effect.fn.Return<EditorLaunch, OpenError> {
   yield* Effect.annotateCurrentSpan({
     "open.editor": input.editor,
@@ -168,7 +188,9 @@ export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
 
   if (editorDef.commands) {
     const command =
-      resolveAvailableCommand(editorDef.commands, { platform, env }) ?? editorDef.commands[0];
+      resolvedCommands.get(input.editor) ??
+      resolveAvailableCommand(editorDef.commands, { platform, env }) ??
+      editorDef.commands[0];
     return {
       command,
       args: resolveEditorArgs(editorDef, input.cwd),
@@ -179,7 +201,10 @@ export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
     return yield* new OpenError({ message: `Unsupported editor: ${input.editor}` });
   }
 
-  return { command: fileManagerCommandForPlatform(platform), args: [input.cwd] };
+  return {
+    command: resolvedCommands.get(input.editor) ?? fileManagerCommandForPlatform(platform),
+    args: [input.cwd],
+  };
 });
 
 export const launchDetached = (launch: EditorLaunch) =>
@@ -191,11 +216,7 @@ export const launchDetached = (launch: EditorLaunch) =>
         child = spawn(
           launch.command,
           isWin32 ? launch.args.map((a) => `"${a}"`) : [...launch.args],
-          {
-            detached: true,
-            stdio: "ignore",
-            shell: isWin32,
-          },
+          { detached: true, stdio: "ignore", shell: isWin32 },
         );
       } catch (error) {
         return resume(
@@ -203,19 +224,34 @@ export const launchDetached = (launch: EditorLaunch) =>
         );
       }
 
-      const handleSpawn = () => {
-        child.unref();
-        resume(Effect.void);
+      let settled = false;
+
+      const handleError = (cause: Error) => {
+        if (!settled) {
+          settled = true;
+          resume(Effect.fail(new OpenError({ message: "failed to spawn detached process", cause })));
+        }
       };
 
-      child.once("spawn", handleSpawn);
-      child.once("error", (cause) =>
-        resume(Effect.fail(new OpenError({ message: "failed to spawn detached process", cause }))),
-      );
+      child.once("error", handleError);
+
+      // ENOENT errors arrive via process.nextTick (before setImmediate), so this
+      // catches command-not-found while returning well before the OS spawn event.
+      setImmediate(() => {
+        if (!settled) {
+          settled = true;
+          child.removeListener("error", handleError);
+          child.once("error", () => {});
+          child.unref();
+          resume(Effect.void);
+        }
+      });
     });
   });
 
 const make = Effect.gen(function* () {
+  const commandMap = resolveEditorCommandMap();
+
   const open = yield* Effect.tryPromise({
     try: () => import("open"),
     catch: (cause) => new OpenError({ message: "failed to load browser opener", cause }),
@@ -227,7 +263,11 @@ const make = Effect.gen(function* () {
         try: () => open.default(target),
         catch: (cause) => new OpenError({ message: "Browser auto-open failed", cause }),
       }),
-    openInEditor: (input) => Effect.flatMap(resolveEditorLaunch(input), launchDetached),
+    openInEditor: (input) =>
+      Effect.flatMap(
+        resolveEditorLaunch(input, process.platform, process.env, commandMap),
+        launchDetached,
+      ),
   } satisfies OpenShape;
 });
 
