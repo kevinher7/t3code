@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createThreadJumpHintVisibilityController,
+  filterProjectSnapshotsByTags,
   getSidebarThreadIdsToPrewarm,
   getVisibleSidebarThreadIds,
   resolveAdjacentThreadId,
@@ -19,8 +20,17 @@ import {
   shouldClearThreadSelectionOnMouseDown,
   sortProjectsForSidebar,
   THREAD_JUMP_HINT_SHOW_DELAY_MS,
+  toggleProjectTagAssignment,
+  toggleTagFilterSelection,
 } from "./Sidebar.logic";
-import { EnvironmentId, OrchestrationLatestTurn, ProjectId, ThreadId } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  OrchestrationLatestTurn,
+  ProjectId,
+  TagId,
+  ThreadId,
+} from "@t3tools/contracts";
+import type { SidebarProjectSnapshot } from "../sidebarProjectGrouping";
 import {
   DEFAULT_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
@@ -961,5 +971,106 @@ describe("sortProjectsForSidebar", () => {
     );
 
     expect(timestamp).toBe(Date.parse("2026-03-09T10:10:00.000Z"));
+  });
+});
+
+describe("toggleTagFilterSelection", () => {
+  const tagA = TagId.make("tag-a");
+  const tagB = TagId.make("tag-b");
+
+  it("adds an unselected tag to the end of the selection", () => {
+    expect(toggleTagFilterSelection([tagA], tagB)).toEqual([tagA, tagB]);
+  });
+
+  it("removes an already-selected tag without disturbing the order of the rest", () => {
+    expect(toggleTagFilterSelection([tagA, tagB], tagA)).toEqual([tagB]);
+  });
+
+  it("returns an empty array when toggling the only selected tag", () => {
+    expect(toggleTagFilterSelection([tagA], tagA)).toEqual([]);
+  });
+});
+
+describe("filterProjectSnapshotsByTags", () => {
+  const tagA = TagId.make("tag-a");
+  const tagB = TagId.make("tag-b");
+  const tagC = TagId.make("tag-c");
+
+  function makeSnapshot(
+    overrides: Partial<SidebarProjectSnapshot> & {
+      projectKey: string;
+      displayTagIds: readonly TagId[];
+    },
+  ): SidebarProjectSnapshot {
+    // Cast through unknown — the helper only inspects `displayTagIds` so we
+    // intentionally narrow the surface used by the test.
+    return {
+      projectKey: overrides.projectKey,
+      displayTagIds: overrides.displayTagIds,
+      ...overrides,
+    } as unknown as SidebarProjectSnapshot;
+  }
+
+  const snapshots = [
+    makeSnapshot({ projectKey: "p-1", displayTagIds: [tagA, tagB] }),
+    makeSnapshot({ projectKey: "p-2", displayTagIds: [tagA] }),
+    makeSnapshot({ projectKey: "p-3", displayTagIds: [tagC] }),
+    makeSnapshot({ projectKey: "p-4", displayTagIds: [] }),
+  ];
+
+  it("returns all snapshots when no tag is selected", () => {
+    expect(filterProjectSnapshotsByTags(snapshots, []).map((s) => s.projectKey)).toEqual([
+      "p-1",
+      "p-2",
+      "p-3",
+      "p-4",
+    ]);
+  });
+
+  it("filters to snapshots that include the selected tag (single)", () => {
+    expect(filterProjectSnapshotsByTags(snapshots, [tagA]).map((s) => s.projectKey)).toEqual([
+      "p-1",
+      "p-2",
+    ]);
+  });
+
+  it("filters using AND semantics when multiple tags are selected", () => {
+    expect(filterProjectSnapshotsByTags(snapshots, [tagA, tagB]).map((s) => s.projectKey)).toEqual([
+      "p-1",
+    ]);
+  });
+
+  it("excludes snapshots with no tags when any tag is selected", () => {
+    expect(filterProjectSnapshotsByTags(snapshots, [tagC]).map((s) => s.projectKey)).toEqual([
+      "p-3",
+    ]);
+  });
+});
+
+describe("toggleProjectTagAssignment", () => {
+  const tagA = TagId.make("tag-a");
+  const tagB = TagId.make("tag-b");
+  const tagC = TagId.make("tag-c");
+
+  it("appends a not-yet-assigned tag to the end of the array", () => {
+    expect(toggleProjectTagAssignment([tagA], tagB)).toEqual([tagA, tagB]);
+  });
+
+  it("removes an already-assigned tag and preserves the order of the remaining tags", () => {
+    expect(toggleProjectTagAssignment([tagA, tagB, tagC], tagB)).toEqual([tagA, tagC]);
+  });
+
+  it("returns an empty array when toggling the only assigned tag", () => {
+    expect(toggleProjectTagAssignment([tagA], tagA)).toEqual([]);
+  });
+
+  it("dedupes existing duplicates while toggling", () => {
+    // Adding a new tag in the presence of duplicates should produce a clean,
+    // dedup-then-append result.
+    expect(toggleProjectTagAssignment([tagA, tagA, tagB], tagC)).toEqual([tagA, tagB, tagC]);
+  });
+
+  it("dedupes existing duplicates when removing a tag that appears multiple times", () => {
+    expect(toggleProjectTagAssignment([tagA, tagA, tagB], tagA)).toEqual([tagB]);
   });
 });
