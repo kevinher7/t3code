@@ -1,3 +1,4 @@
+import type { TagId } from "@t3tools/contracts";
 import { Debouncer } from "@tanstack/react-pacer";
 import { create } from "zustand";
 
@@ -20,6 +21,7 @@ export interface PersistedUiState {
   expandedProjectCwds?: string[];
   projectOrderCwds?: string[];
   threadChangedFilesExpandedById?: Record<string, Record<string, boolean>>;
+  projectTagFilterSelectedTagIds?: string[];
 }
 
 export interface UiProjectState {
@@ -32,7 +34,9 @@ export interface UiThreadState {
   threadChangedFilesExpandedById: Record<string, Record<string, boolean>>;
 }
 
-export interface UiState extends UiProjectState, UiThreadState {}
+export interface UiState extends UiProjectState, UiThreadState {
+  projectTagFilter: { selectedTagIds: TagId[] };
+}
 
 export interface SyncProjectInput {
   /** Physical project key (env + cwd). Used for manual sort order. */
@@ -52,6 +56,7 @@ const initialState: UiState = {
   projectOrder: [],
   threadLastVisitedAtById: {},
   threadChangedFilesExpandedById: {},
+  projectTagFilter: { selectedTagIds: [] },
 };
 
 const persistedCollapsedProjectCwds = new Set<string>();
@@ -91,6 +96,11 @@ function readPersistedState(): UiState {
       threadChangedFilesExpandedById: sanitizePersistedThreadChangedFilesExpanded(
         parsed.threadChangedFilesExpandedById,
       ),
+      projectTagFilter: {
+        selectedTagIds: (parsed.projectTagFilterSelectedTagIds ?? [])
+          .filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+          .map((entry) => entry as TagId),
+      },
     };
   } catch {
     return initialState;
@@ -180,6 +190,7 @@ export function persistState(state: UiState): void {
         expandedProjectCwds,
         projectOrderCwds,
         threadChangedFilesExpandedById,
+        projectTagFilterSelectedTagIds: state.projectTagFilter.selectedTagIds.map((tagId) => tagId),
       } satisfies PersistedUiState),
     );
     if (!legacyKeysCleanedUp) {
@@ -599,6 +610,34 @@ export function reorderProjects(
   };
 }
 
+export function setProjectTagFilterSelection(
+  state: UiState,
+  selectedTagIds: readonly TagId[],
+): UiState {
+  if (
+    state.projectTagFilter.selectedTagIds.length === selectedTagIds.length &&
+    state.projectTagFilter.selectedTagIds.every((id, index) => id === selectedTagIds[index])
+  ) {
+    return state;
+  }
+  return {
+    ...state,
+    projectTagFilter: { selectedTagIds: [...selectedTagIds] },
+  };
+}
+
+export function clearProjectTagFilterTagId(state: UiState, tagId: TagId): UiState {
+  if (!state.projectTagFilter.selectedTagIds.includes(tagId)) {
+    return state;
+  }
+  return {
+    ...state,
+    projectTagFilter: {
+      selectedTagIds: state.projectTagFilter.selectedTagIds.filter((id) => id !== tagId),
+    },
+  };
+}
+
 interface UiStateStore extends UiState {
   syncProjects: (projects: readonly SyncProjectInput[]) => void;
   syncThreads: (threads: readonly SyncThreadInput[]) => void;
@@ -612,6 +651,8 @@ interface UiStateStore extends UiState {
     draggedProjectIds: readonly string[],
     targetProjectIds: readonly string[],
   ) => void;
+  setProjectTagFilterSelection: (selectedTagIds: readonly TagId[]) => void;
+  clearProjectTagFilterTagId: (tagId: TagId) => void;
 }
 
 export const useUiStateStore = create<UiStateStore>((set) => ({
@@ -630,6 +671,9 @@ export const useUiStateStore = create<UiStateStore>((set) => ({
     set((state) => setProjectExpanded(state, projectId, expanded)),
   reorderProjects: (draggedProjectIds, targetProjectIds) =>
     set((state) => reorderProjects(state, draggedProjectIds, targetProjectIds)),
+  setProjectTagFilterSelection: (selectedTagIds) =>
+    set((state) => setProjectTagFilterSelection(state, selectedTagIds)),
+  clearProjectTagFilterTagId: (tagId) => set((state) => clearProjectTagFilterTagId(state, tagId)),
 }));
 
 useUiStateStore.subscribe((state) => debouncedPersistState.maybeExecute(state));

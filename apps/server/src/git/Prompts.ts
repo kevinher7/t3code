@@ -34,9 +34,7 @@ export function buildCommitMessagePrompt(input: CommitMessagePromptInput) {
     "- subject must be imperative, <= 72 chars, and no trailing period",
     "- body can be empty string or short bullet points",
     ...(wantsBranch
-      ? [
-          "- branch must be a short semantic git branch fragment for this change",
-        ]
+      ? ["- branch must be a short semantic git branch fragment for this change"]
       : []),
     "- capture the primary user-visible or developer-visible change",
     "",
@@ -136,8 +134,7 @@ interface PromptFromMessageInput {
 
 function buildPromptFromMessage(input: PromptFromMessageInput): string {
   const attachmentLines = (input.attachments ?? []).map(
-    (attachment) =>
-      `- ${attachment.name} (${attachment.mimeType}, ${attachment.sizeBytes} bytes)`,
+    (attachment) => `- ${attachment.name} (${attachment.mimeType}, ${attachment.sizeBytes} bytes)`,
   );
 
   const promptSections = [

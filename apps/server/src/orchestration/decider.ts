@@ -2,14 +2,20 @@ import type {
   OrchestrationCommand,
   OrchestrationEvent,
   OrchestrationReadModel,
+  TagId,
 } from "@t3tools/contracts";
+import { TAG_NAME_MAX_CHARS, TAG_NAME_PATTERN } from "@t3tools/contracts";
 import { Effect } from "effect";
 
 import { OrchestrationCommandInvariantError } from "./Errors.ts";
 import {
   listThreadsByProjectId,
+  normalizeTagName,
   requireProject,
   requireProjectAbsent,
+  requireTag,
+  requireTagNameAvailable,
+  requireTagsExist,
   requireThread,
   requireThreadArchived,
   requireThreadAbsent,
@@ -58,9 +64,11 @@ type DecideOrchestrationCommandResult =
 const decideCommandSequence = Effect.fn("decideCommandSequence")(function* ({
   commands,
   readModel,
+  trailingEvent,
 }: {
   readonly commands: ReadonlyArray<OrchestrationCommand>;
   readonly readModel: OrchestrationReadModel;
+  readonly trailingEvent?: (readModel: OrchestrationReadModel) => PlannedOrchestrationEvent;
 }): Effect.fn.Return<ReadonlyArray<PlannedOrchestrationEvent>, OrchestrationCommandInvariantError> {
   let nextReadModel = readModel;
   let nextSequence = readModel.snapshotSequence;
@@ -80,6 +88,11 @@ const decideCommandSequence = Effect.fn("decideCommandSequence")(function* ({
         sequence: nextSequence,
       }).pipe(Effect.orDie);
     }
+  }
+
+  if (trailingEvent !== undefined) {
+    const trailing = trailingEvent(nextReadModel);
+    plannedEvents.push(trailing);
   }
 
   return plannedEvents;
@@ -114,6 +127,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           workspaceRoot: command.workspaceRoot,
           defaultModelSelection: command.defaultModelSelection ?? null,
           scripts: [],
+          tags: [],
           createdAt: command.createdAt,
           updatedAt: command.createdAt,
         },
@@ -126,6 +140,13 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         command,
         projectId: command.projectId,
       });
+      if (command.tags !== undefined) {
+        yield* requireTagsExist({
+          readModel,
+          command,
+          tagIds: command.tags,
+        });
+      }
       const occurredAt = nowIso();
       return {
         ...withEventBase({
@@ -143,6 +164,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
             ? { defaultModelSelection: command.defaultModelSelection }
             : {}),
           ...(command.scripts !== undefined ? { scripts: command.scripts } : {}),
+          ...(command.tags !== undefined ? { tags: command.tags } : {}),
           updatedAt: occurredAt,
         },
       };
@@ -741,6 +763,98 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
       };
     }
 
+    case "tag.create": {
+      yield* validateTagName({ command, name: command.name });
+      const trimmed = normalizeTagName(command.name);
+      yield* requireTagNameAvailable({
+        readModel,
+        command,
+        name: trimmed,
+      });
+      return {
+        ...withEventBase({
+          aggregateKind: "tag",
+          aggregateId: command.tagId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        }),
+        type: "tag.created",
+        payload: {
+          tagId: command.tagId,
+          name: trimmed,
+          createdAt: command.createdAt,
+          updatedAt: command.createdAt,
+        },
+      };
+    }
+
+    case "tag.rename": {
+      yield* requireTag({ readModel, command, tagId: command.tagId });
+      yield* validateTagName({ command, name: command.name });
+      const trimmed = normalizeTagName(command.name);
+      yield* requireTagNameAvailable({
+        readModel,
+        command,
+        name: trimmed,
+        ignoreTagId: command.tagId,
+      });
+      const occurredAt = nowIso();
+      return {
+        ...withEventBase({
+          aggregateKind: "tag",
+          aggregateId: command.tagId,
+          occurredAt,
+          commandId: command.commandId,
+        }),
+        type: "tag.renamed",
+        payload: {
+          tagId: command.tagId,
+          name: trimmed,
+          updatedAt: occurredAt,
+        },
+      };
+    }
+
+    case "tag.delete": {
+      yield* requireTag({ readModel, command, tagId: command.tagId });
+      const referencingProjects = readModel.projects.filter((project) =>
+        project.tags.includes(command.tagId),
+      );
+      const occurredAt = nowIso();
+      const tagDeletedEvent: PlannedOrchestrationEvent = {
+        ...withEventBase({
+          aggregateKind: "tag",
+          aggregateId: command.tagId,
+          occurredAt,
+          commandId: command.commandId,
+        }),
+        type: "tag.deleted",
+        payload: {
+          tagId: command.tagId,
+          deletedAt: occurredAt,
+        },
+      };
+
+      if (referencingProjects.length === 0) {
+        return tagDeletedEvent;
+      }
+
+      const cascadeCommands = referencingProjects.map(
+        (project): Extract<OrchestrationCommand, { type: "project.meta.update" }> => ({
+          type: "project.meta.update",
+          commandId: command.commandId,
+          projectId: project.id,
+          tags: project.tags.filter((id: TagId) => id !== command.tagId),
+        }),
+      );
+
+      return yield* decideCommandSequence({
+        readModel,
+        commands: cascadeCommands,
+        trailingEvent: () => tagDeletedEvent,
+      });
+    }
+
     default: {
       command satisfies never;
       const fallback = command as never as { type: string };
@@ -751,3 +865,35 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
     }
   }
 });
+
+function validateTagName(input: {
+  readonly command: OrchestrationCommand;
+  readonly name: string;
+}): Effect.Effect<void, OrchestrationCommandInvariantError> {
+  const trimmed = normalizeTagName(input.name);
+  if (trimmed.length === 0) {
+    return Effect.fail(
+      new OrchestrationCommandInvariantError({
+        commandType: input.command.type,
+        detail: "Tag name must be non-empty after trimming.",
+      }),
+    );
+  }
+  if (trimmed.length > TAG_NAME_MAX_CHARS) {
+    return Effect.fail(
+      new OrchestrationCommandInvariantError({
+        commandType: input.command.type,
+        detail: `Tag name must be at most ${TAG_NAME_MAX_CHARS} characters.`,
+      }),
+    );
+  }
+  if (!TAG_NAME_PATTERN.test(trimmed)) {
+    return Effect.fail(
+      new OrchestrationCommandInvariantError({
+        commandType: input.command.type,
+        detail: "Tag name may only contain letters, digits, spaces, '-', and '_'.",
+      }),
+    );
+  }
+  return Effect.void;
+}

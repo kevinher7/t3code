@@ -99,6 +99,7 @@ function makeState(thread: Thread): AppState {
     createdAt: "2026-02-13T00:00:00.000Z",
     updatedAt: "2026-02-13T00:00:00.000Z",
     scripts: [],
+    tags: [],
   };
   const threadIdsByProjectId: EnvironmentState["threadIdsByProjectId"] = {
     [thread.projectId]: [thread.id],
@@ -108,6 +109,8 @@ function makeState(thread: Thread): AppState {
     projectById: {
       [projectId]: project,
     },
+    tagIds: [],
+    tagById: {},
     threadIds: [thread.id],
     threadIdsByProjectId,
     threadShellById: {
@@ -183,6 +186,8 @@ function makeEmptyState(overrides: Partial<AppState & EnvironmentState> = {}): A
   const environmentState: EnvironmentState = {
     projectIds: [],
     projectById: {},
+    tagIds: [],
+    tagById: {},
     threadIds: [],
     threadIdsByProjectId: {},
     threadShellById: {},
@@ -469,6 +474,7 @@ describe("incremental orchestration updates", () => {
           createdAt: "2026-02-27T00:00:00.000Z",
           updatedAt: "2026-02-27T00:00:00.000Z",
           scripts: [],
+          tags: [],
         },
       },
     });
@@ -484,6 +490,7 @@ describe("incremental orchestration updates", () => {
           model: DEFAULT_MODEL_BY_PROVIDER.codex,
         },
         scripts: [],
+        tags: [],
         createdAt: "2026-02-27T00:00:01.000Z",
         updatedAt: "2026-02-27T00:00:01.000Z",
       }),
@@ -524,6 +531,7 @@ describe("incremental orchestration updates", () => {
           createdAt: "2026-02-27T00:00:00.000Z",
           updatedAt: "2026-02-27T00:00:00.000Z",
           scripts: [],
+          tags: [],
         },
         [recreatedProjectId]: {
           id: recreatedProjectId,
@@ -537,6 +545,7 @@ describe("incremental orchestration updates", () => {
           createdAt: "2026-02-27T00:00:00.000Z",
           updatedAt: "2026-02-27T00:00:00.000Z",
           scripts: [],
+          tags: [],
         },
       },
     });

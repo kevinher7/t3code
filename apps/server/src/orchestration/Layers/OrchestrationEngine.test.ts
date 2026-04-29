@@ -98,6 +98,7 @@ describe("OrchestrationEngine", () => {
     const projectionSnapshot = {
       snapshotSequence: 7,
       updatedAt: "2026-03-03T00:00:04.000Z",
+      tags: [],
       projects: [
         {
           id: asProjectId("project-bootstrap"),
@@ -108,6 +109,7 @@ describe("OrchestrationEngine", () => {
             model: "gpt-5-codex",
           },
           scripts: [],
+          tags: [],
           createdAt: "2026-03-03T00:00:00.000Z",
           updatedAt: "2026-03-03T00:00:01.000Z",
           deletedAt: null,
@@ -149,6 +151,7 @@ describe("OrchestrationEngine", () => {
               snapshotSequence: projectionSnapshot.snapshotSequence,
               projects: [],
               threads: [],
+              tags: [],
               updatedAt: projectionSnapshot.updatedAt,
             }),
           getCounts: () => Effect.succeed({ projectCount: 1, threadCount: 1 }),
@@ -158,6 +161,8 @@ describe("OrchestrationEngine", () => {
           getThreadCheckpointContext: () => Effect.succeed(Option.none()),
           getThreadShellById: () => Effect.succeed(Option.none()),
           getThreadDetailById: () => Effect.succeed(Option.none()),
+          listAllTags: () => Effect.succeed([]),
+          getTagById: () => Effect.succeed(Option.none()),
         }),
       ),
       Layer.provide(

@@ -469,7 +469,9 @@ const make = Effect.gen(function* () {
       const { textGenerationModelSelection: modelSelection } =
         yield* serverSettingsService.getSettings;
 
-      const fullName = yield* git.readConfigValue(cwd, "user.name").pipe(Effect.orElseSucceed(() => null));
+      const fullName = yield* git
+        .readConfigValue(cwd, "user.name")
+        .pipe(Effect.orElseSucceed(() => null));
       const firstName = fullName ? fullName.trim().split(/\s+/)[0]!.toLowerCase() : undefined;
 
       const generated = yield* textGeneration.generateBranchName({

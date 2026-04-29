@@ -42,6 +42,7 @@ import {
   ProjectId,
   type ScopedThreadRef,
   type SidebarProjectGroupingMode,
+  TagId,
   type ThreadEnvMode,
   ThreadId,
 } from "@t3tools/contracts";
@@ -61,12 +62,13 @@ import { usePrimaryEnvironmentId } from "../environments/primary";
 import { isElectron } from "../env";
 import { APP_STAGE_LABEL, APP_VERSION } from "../branding";
 import { isTerminalFocused } from "../lib/terminalFocus";
-import { isMacPlatform, newCommandId } from "../lib/utils";
+import { cn, isMacPlatform, newCommandId } from "../lib/utils";
 import {
   selectProjectByRef,
   selectProjectsAcrossEnvironments,
   selectSidebarThreadsForProjectRefs,
   selectSidebarThreadsAcrossEnvironments,
+  selectTagsAcrossEnvironments,
   selectThreadByRef,
   useStore,
 } from "../store";
@@ -150,6 +152,7 @@ import {
   getSidebarThreadIdsToPrewarm,
   resolveAdjacentThreadId,
   isContextMenuPointerDown,
+  filterProjectSnapshotsByTags,
   resolveProjectStatusIndicator,
   resolveSidebarNewThreadSeedContext,
   resolveSidebarNewThreadEnvMode,
@@ -158,6 +161,7 @@ import {
   orderItemsByPreferredIds,
   shouldClearThreadSelectionOnMouseDown,
   sortProjectsForSidebar,
+  toggleTagFilterSelection,
   useThreadJumpHintVisibility,
   ThreadStatusPill,
 } from "./Sidebar.logic";
@@ -177,7 +181,7 @@ import {
   useSavedEnvironmentRegistryStore,
   useSavedEnvironmentRuntimeStore,
 } from "../environments/runtime";
-import type { SidebarThreadSummary } from "../types";
+import type { SidebarThreadSummary, Tag } from "../types";
 import {
   buildPhysicalToLogicalProjectKeyMap,
   buildSidebarProjectSnapshots,
@@ -2437,6 +2441,11 @@ interface SidebarProjectsContentProps {
   projectGroupingMode: SidebarProjectGroupingMode;
   updateSettings: ReturnType<typeof useUpdateSettings>["updateSettings"];
   openAddProject: () => void;
+  tagsForSidebar: readonly Tag[];
+  selectedTagIds: readonly TagId[];
+  onTagChipToggle: (tagId: TagId) => void;
+  onTagChipContextMenu: (tag: Tag, position: { x: number; y: number }) => void;
+  onOpenTagCreateDialog: () => void;
   isManualProjectSorting: boolean;
   projectDnDSensors: ReturnType<typeof useSensors>;
   projectCollisionDetection: CollisionDetection;
@@ -2477,6 +2486,11 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
     projectGroupingMode,
     updateSettings,
     openAddProject,
+    tagsForSidebar,
+    selectedTagIds,
+    onTagChipToggle,
+    onTagChipContextMenu,
+    onOpenTagCreateDialog,
     isManualProjectSorting,
     projectDnDSensors,
     projectCollisionDetection,
@@ -2570,6 +2584,57 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
           </Alert>
         </SidebarGroup>
       ) : null}
+      <SidebarGroup className="px-2 pt-2 pb-1">
+        <div className="mb-1 flex items-center justify-between pl-2 pr-1.5">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+            Tags
+          </span>
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label="Add tag"
+                    data-testid="sidebar-add-tag-trigger"
+                    className="inline-flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
+                    onClick={onOpenTagCreateDialog}
+                  />
+                }
+              >
+                <PlusIcon className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipPopup side="right">Add tag</TooltipPopup>
+            </Tooltip>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1 pl-2 pr-1.5">
+          {tagsForSidebar.map((tag) => {
+            const isSelected = selectedTagIds.includes(tag.id);
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                data-testid={`sidebar-tag-chip-${tag.id}`}
+                aria-pressed={isSelected}
+                className={cn(
+                  "rounded-full border px-2 py-0.5 text-[11px] transition-colors",
+                  isSelected
+                    ? "bg-primary/15 text-foreground"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+                onClick={() => onTagChipToggle(tag.id)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  onTagChipContextMenu(tag, { x: event.clientX, y: event.clientY });
+                }}
+              >
+                {tag.name}
+              </button>
+            );
+          })}
+        </div>
+      </SidebarGroup>
       <SidebarGroup className="px-2 py-2">
         <div className="mb-1 flex items-center justify-between pl-2 pr-1.5">
           <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
@@ -2688,10 +2753,140 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
 
 export default function Sidebar() {
   const projects = useStore(useShallow(selectProjectsAcrossEnvironments));
+  const tagsForSidebar = useStore(useShallow(selectTagsAcrossEnvironments));
   const sidebarThreads = useStore(useShallow(selectSidebarThreadsAcrossEnvironments));
   const projectExpandedById = useUiStateStore((store) => store.projectExpandedById);
   const projectOrder = useUiStateStore((store) => store.projectOrder);
   const reorderProjects = useUiStateStore((store) => store.reorderProjects);
+  const selectedTagIds = useUiStateStore((store) => store.projectTagFilter.selectedTagIds);
+  const setProjectTagFilterSelection = useUiStateStore(
+    (store) => store.setProjectTagFilterSelection,
+  );
+  const [tagCreateDialogOpen, setTagCreateDialogOpen] = useState(false);
+  const [tagCreateName, setTagCreateName] = useState("");
+  const [tagRenameTarget, setTagRenameTarget] = useState<Tag | null>(null);
+  const [tagRenameName, setTagRenameName] = useState("");
+  const handleTagChipToggle = useCallback(
+    (tagId: TagId) => {
+      setProjectTagFilterSelection(toggleTagFilterSelection(selectedTagIds, tagId));
+    },
+    [selectedTagIds, setProjectTagFilterSelection],
+  );
+  const handleTagChipContextMenu = useCallback((tag: Tag, _position: { x: number; y: number }) => {
+    // Minimal v1 of the chip context menu: open the rename dialog. A full
+    // popover-based right-click menu (rename + delete) can be layered on
+    // later without changing the chip props.
+    setTagRenameTarget(tag);
+    setTagRenameName(tag.name);
+  }, []);
+  const openTagCreateDialog = useCallback(() => {
+    setTagCreateName("");
+    setTagCreateDialogOpen(true);
+  }, []);
+  const closeTagCreateDialog = useCallback(() => {
+    setTagCreateDialogOpen(false);
+    setTagCreateName("");
+  }, []);
+  const closeTagRenameDialog = useCallback(() => {
+    setTagRenameTarget(null);
+    setTagRenameName("");
+  }, []);
+  const submitTagCreate = useCallback(async () => {
+    const trimmed = tagCreateName.trim();
+    if (trimmed.length === 0) {
+      toastManager.add({ type: "warning", title: "Tag name cannot be empty" });
+      return;
+    }
+    const environmentIds = Array.from(new Set(projects.map((project) => project.environmentId)));
+    if (environmentIds.length === 0) {
+      toastManager.add({
+        type: "warning",
+        title: "No environments available",
+        description: "Connect to at least one environment before creating tags.",
+      });
+      return;
+    }
+    const sharedTagId = TagId.make(crypto.randomUUID());
+    const createdAt = new Date().toISOString();
+    const failures: string[] = [];
+    for (const environmentId of environmentIds) {
+      const api = readEnvironmentApi(environmentId);
+      if (!api) {
+        failures.push(environmentId);
+        continue;
+      }
+      try {
+        await api.orchestration.dispatchCommand({
+          type: "tag.create",
+          commandId: newCommandId(),
+          tagId: sharedTagId,
+          name: trimmed,
+          createdAt,
+        });
+      } catch (error) {
+        failures.push(
+          `${environmentId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    if (failures.length === environmentIds.length) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Failed to create tag",
+          description: failures.join("\n"),
+        }),
+      );
+      return;
+    }
+    closeTagCreateDialog();
+  }, [closeTagCreateDialog, projects, tagCreateName]);
+  const submitTagRename = useCallback(async () => {
+    if (!tagRenameTarget) {
+      return;
+    }
+    const trimmed = tagRenameName.trim();
+    if (trimmed.length === 0) {
+      toastManager.add({ type: "warning", title: "Tag name cannot be empty" });
+      return;
+    }
+    if (trimmed === tagRenameTarget.name) {
+      closeTagRenameDialog();
+      return;
+    }
+    const environmentIds = Array.from(new Set(projects.map((project) => project.environmentId)));
+    const failures: string[] = [];
+    for (const environmentId of environmentIds) {
+      const api = readEnvironmentApi(environmentId);
+      if (!api) {
+        failures.push(environmentId);
+        continue;
+      }
+      try {
+        await api.orchestration.dispatchCommand({
+          type: "tag.rename",
+          commandId: newCommandId(),
+          tagId: tagRenameTarget.id,
+          name: trimmed,
+        });
+      } catch (error) {
+        failures.push(
+          `${environmentId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    if (failures.length === environmentIds.length) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Failed to rename tag",
+          description: failures.join("\n"),
+        }),
+      );
+      return;
+    }
+    closeTagRenameDialog();
+  }, [closeTagRenameDialog, projects, tagRenameName, tagRenameTarget]);
   const navigate = useNavigate();
   const pathname = useLocation({ select: (loc) => loc.pathname });
   const isOnSettings = pathname.startsWith("/settings");
@@ -2938,7 +3133,8 @@ export default function Sidebar() {
     [sidebarThreads],
   );
   const sortedProjects = useMemo(() => {
-    const sortableProjects = sidebarProjects.map((project) => ({
+    const filteredSidebarProjects = filterProjectSnapshotsByTags(sidebarProjects, selectedTagIds);
+    const sortableProjects = filteredSidebarProjects.map((project) => ({
       ...project,
       id: project.projectKey,
     }));
@@ -2967,6 +3163,7 @@ export default function Sidebar() {
     sidebarProjectByKey,
     sidebarProjects,
     visibleThreads,
+    selectedTagIds,
   ]);
   const isManualProjectSorting = sidebarProjectSortOrder === "manual";
   const visibleSidebarThreadKeys = useMemo(
@@ -3329,6 +3526,11 @@ export default function Sidebar() {
             projectGroupingMode={sidebarProjectGroupingMode}
             updateSettings={updateSettings}
             openAddProject={openAddProjectCommandPalette}
+            tagsForSidebar={tagsForSidebar}
+            selectedTagIds={selectedTagIds}
+            onTagChipToggle={handleTagChipToggle}
+            onTagChipContextMenu={handleTagChipContextMenu}
+            onOpenTagCreateDialog={openTagCreateDialog}
             isManualProjectSorting={isManualProjectSorting}
             projectDnDSensors={projectDnDSensors}
             projectCollisionDetection={projectCollisionDetection}
@@ -3359,6 +3561,88 @@ export default function Sidebar() {
           <SidebarChromeFooter />
         </>
       )}
+      <Dialog
+        open={tagCreateDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeTagCreateDialog();
+          }
+        }}
+      >
+        <DialogPopup className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>New tag</DialogTitle>
+            <DialogDescription>
+              Tags are shared across projects in the catalog and used to filter the project list.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel className="space-y-4">
+            <div className="grid gap-1.5">
+              <span className="text-xs font-medium text-foreground">Tag name</span>
+              <Input
+                aria-label="Tag name"
+                value={tagCreateName}
+                onChange={(event) => setTagCreateName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void submitTagCreate();
+                  }
+                }}
+                data-testid="sidebar-tag-create-input"
+              />
+            </div>
+          </DialogPanel>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeTagCreateDialog}>
+              Cancel
+            </Button>
+            <Button onClick={() => void submitTagCreate()}>Create</Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+      <Dialog
+        open={tagRenameTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeTagRenameDialog();
+          }
+        }}
+      >
+        <DialogPopup className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename tag</DialogTitle>
+            <DialogDescription>
+              {tagRenameTarget
+                ? `Update the name of "${tagRenameTarget.name}".`
+                : "Update the tag name."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel className="space-y-4">
+            <div className="grid gap-1.5">
+              <span className="text-xs font-medium text-foreground">Tag name</span>
+              <Input
+                aria-label="Tag name"
+                value={tagRenameName}
+                onChange={(event) => setTagRenameName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void submitTagRename();
+                  }
+                }}
+                data-testid="sidebar-tag-rename-input"
+              />
+            </div>
+          </DialogPanel>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeTagRenameDialog}>
+              Cancel
+            </Button>
+            <Button onClick={() => void submitTagRename()}>Save</Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
     </>
   );
 }

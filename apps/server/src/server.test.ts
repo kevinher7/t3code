@@ -130,6 +130,7 @@ const makeDefaultOrchestrationReadModel = () => {
   return {
     snapshotSequence: 0,
     updatedAt: now,
+    tags: [],
     projects: [
       {
         id: defaultProjectId,
@@ -137,6 +138,7 @@ const makeDefaultOrchestrationReadModel = () => {
         workspaceRoot: "/tmp/default-project",
         defaultModelSelection,
         scripts: [],
+        tags: [],
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
@@ -470,6 +472,7 @@ const buildAppUnderTest = (options?: {
               snapshotSequence: 0,
               projects: [],
               threads: [],
+              tags: [],
               updatedAt: new Date(0).toISOString(),
             }),
           getProjectShellById: () => Effect.succeed(Option.none()),
@@ -479,6 +482,8 @@ const buildAppUnderTest = (options?: {
           getActiveProjectByWorkspaceRoot: () => Effect.succeed(Option.none()),
           getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
           getThreadCheckpointContext: () => Effect.succeed(Option.none()),
+          listAllTags: () => Effect.succeed([]),
+          getTagById: () => Effect.succeed(Option.none()),
           ...options?.layers?.projectionSnapshotQuery,
         }),
       ),
@@ -2874,6 +2879,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       const snapshot = {
         snapshotSequence: 1,
         updatedAt: now,
+        tags: [],
         projects: [
           {
             id: ProjectId.make("project-a"),
@@ -2881,6 +2887,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             workspaceRoot: "/tmp/project-a",
             defaultModelSelection,
             scripts: [],
+            tags: [],
             createdAt: now,
             updatedAt: now,
             deletedAt: null,
@@ -3019,6 +3026,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                   workspaceRoot: "/tmp/default-project",
                   defaultModelSelection,
                   scripts: [],
+                  tags: [],
                   createdAt: "2026-04-05T00:00:00.000Z",
                   updatedAt: "2026-04-05T00:00:00.000Z",
                 },
