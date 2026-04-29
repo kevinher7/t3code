@@ -558,3 +558,23 @@ export function filterProjectSnapshotsByTags(
 export function toggleTagFilterSelection(selected: readonly TagId[], tagId: TagId): TagId[] {
   return selected.includes(tagId) ? selected.filter((id) => id !== tagId) : [...selected, tagId];
 }
+
+/**
+ * Returns the new tag-id array for a `project.meta.update` payload after toggling
+ * `tagId` on the given project. Removing an already-assigned tag preserves the
+ * relative order of the remaining tags. Adding a new tag appends it to the end.
+ * The result is always deduplicated.
+ */
+export function toggleProjectTagAssignment(currentTagIds: readonly TagId[], tagId: TagId): TagId[] {
+  const seen = new Set<TagId>();
+  const deduped: TagId[] = [];
+  for (const existing of currentTagIds) {
+    if (seen.has(existing)) continue;
+    seen.add(existing);
+    deduped.push(existing);
+  }
+  if (seen.has(tagId)) {
+    return deduped.filter((id) => id !== tagId);
+  }
+  return [...deduped, tagId];
+}
