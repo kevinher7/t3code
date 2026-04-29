@@ -327,11 +327,13 @@ function createSnapshotForTargetUser(options: {
           model: "gpt-5",
         },
         scripts: [],
+        tags: [],
         createdAt: NOW_ISO,
         updatedAt: NOW_ISO,
         deletedAt: null,
       },
     ],
+    tags: [],
     threads: [
       {
         id: THREAD_ID,
@@ -809,6 +811,7 @@ function createSnapshotWithSecondaryProject(options?: {
         workspaceRoot: "/repo/clients/docs-portal",
         defaultModelSelection: { provider: "codex", model: "gpt-5" },
         scripts: [],
+        tags: [],
         createdAt: NOW_ISO,
         updatedAt: NOW_ISO,
         deletedAt: null,

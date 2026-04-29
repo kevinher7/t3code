@@ -62,6 +62,7 @@ function makeReadModel(
   return {
     snapshotSequence: 0,
     updatedAt: now,
+    tags: [],
     projects: [
       {
         id: projectId,
@@ -69,6 +70,7 @@ function makeReadModel(
         workspaceRoot: "/tmp/provider-reaper-project",
         defaultModelSelection,
         scripts: [],
+        tags: [],
         createdAt: now,
         updatedAt: now,
         deletedAt: null,

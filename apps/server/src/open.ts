@@ -229,7 +229,9 @@ export const launchDetached = (launch: EditorLaunch) =>
       const handleError = (cause: Error) => {
         if (!settled) {
           settled = true;
-          resume(Effect.fail(new OpenError({ message: "failed to spawn detached process", cause })));
+          resume(
+            Effect.fail(new OpenError({ message: "failed to spawn detached process", cause })),
+          );
         }
       };
 

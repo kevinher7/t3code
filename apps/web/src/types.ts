@@ -7,6 +7,7 @@ import type {
   OrchestrationSessionStatus,
   OrchestrationThreadActivity,
   ProjectScript as ContractProjectScript,
+  TagId,
   ThreadId,
   ProjectId,
   TurnId,
@@ -90,6 +91,15 @@ export interface Project {
   createdAt?: string | undefined;
   updatedAt?: string | undefined;
   scripts: ProjectScript[];
+  tags: TagId[];
+}
+
+export interface Tag {
+  id: TagId;
+  environmentId: EnvironmentId;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Thread {
