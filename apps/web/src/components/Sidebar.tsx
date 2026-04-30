@@ -1,7 +1,7 @@
 import {
   ArchiveIcon,
   ArrowUpDownIcon,
-  ChevronDownIcon,
+  CheckIcon,
   ChevronRightIcon,
   CloudIcon,
   GitPullRequestIcon,
@@ -65,7 +65,7 @@ import { usePrimaryEnvironmentId } from "../environments/primary";
 import { isElectron } from "../env";
 import { APP_STAGE_LABEL, APP_VERSION } from "../branding";
 import { isTerminalFocused } from "../lib/terminalFocus";
-import { isMacPlatform, newCommandId } from "../lib/utils";
+import { cn, isMacPlatform, newCommandId } from "../lib/utils";
 import {
   selectProjectByRef,
   selectProjectsAcrossEnvironments,
@@ -114,6 +114,7 @@ import {
 } from "./desktopUpdate.logic";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "./ui/alert";
 import { Button } from "./ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import {
   Dialog,
   DialogDescription,
@@ -133,12 +134,10 @@ import {
   MenuRadioGroup,
   MenuRadioItem,
   MenuSeparator,
-  MenuSub,
-  MenuSubPopup,
-  MenuSubTrigger,
   MenuTrigger,
 } from "./ui/menu";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "./ui/select";
+import { Toggle } from "./ui/toggle";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import {
   SidebarContent,
@@ -2368,7 +2367,134 @@ function ProjectSortMenu({
   );
 }
 
-interface TagFilterMenuProps {
+interface TagFilterPillContextMenuProps {
+  anchor: { x: number; y: number };
+  onClose: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}
+
+function TagFilterPillContextMenu({
+  anchor,
+  onClose,
+  onRename,
+  onDelete,
+}: TagFilterPillContextMenuProps) {
+  // The portaled positioner reads anchor coordinates from a virtual element
+  // whose `getBoundingClientRect` returns a zero-size rect at the click point.
+  // Mirrors the approach used by ProjectTagAssignMenu below.
+  const virtualAnchor = useMemo(
+    () => ({
+      getBoundingClientRect: (): DOMRect => ({
+        x: anchor.x,
+        y: anchor.y,
+        top: anchor.y,
+        left: anchor.x,
+        right: anchor.x,
+        bottom: anchor.y,
+        width: 0,
+        height: 0,
+        toJSON: () => ({}),
+      }),
+    }),
+    [anchor.x, anchor.y],
+  );
+  return (
+    <Menu
+      defaultOpen
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose();
+        }
+      }}
+    >
+      <MenuPopup
+        anchor={virtualAnchor}
+        align="start"
+        side="bottom"
+        className="min-w-32"
+      >
+        <MenuItem
+          onClick={() => {
+            onRename();
+            onClose();
+          }}
+        >
+          Rename…
+        </MenuItem>
+        <MenuItem
+          variant="destructive"
+          onClick={() => {
+            onDelete();
+            onClose();
+          }}
+        >
+          Delete
+        </MenuItem>
+      </MenuPopup>
+    </Menu>
+  );
+}
+
+interface TagFilterPillProps {
+  tag: Tag;
+  pressed: boolean;
+  onPressedChange: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}
+
+function TagFilterPill({
+  tag,
+  pressed,
+  onPressedChange,
+  onRename,
+  onDelete,
+}: TagFilterPillProps) {
+  const [contextAnchor, setContextAnchor] = useState<{ x: number; y: number } | null>(null);
+  return (
+    <>
+      <Toggle
+        size="xs"
+        variant="outline"
+        pressed={pressed}
+        onPressedChange={onPressedChange}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setContextAnchor({ x: event.clientX, y: event.clientY });
+        }}
+        data-testid={`sidebar-tag-filter-item-${tag.id}`}
+        aria-pressed={pressed}
+        className={cn(
+          "h-6 gap-1 rounded-full px-2 text-[10px] font-medium sm:h-5",
+          "data-pressed:border-foreground data-pressed:bg-foreground data-pressed:text-background",
+          "data-pressed:hover:bg-foreground/90",
+        )}
+      >
+        <CheckIcon
+          className={cn("size-2.5 shrink-0", pressed ? "opacity-100" : "opacity-0")}
+          aria-hidden
+        />
+        <span
+          data-testid={`sidebar-tag-filter-toggle-${tag.id}`}
+          className="max-w-40 truncate"
+        >
+          {tag.name}
+        </span>
+      </Toggle>
+      {contextAnchor ? (
+        <TagFilterPillContextMenu
+          anchor={contextAnchor}
+          onClose={() => setContextAnchor(null)}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
+      ) : null}
+    </>
+  );
+}
+
+interface TagFilterPillsProps {
   tags: readonly Tag[];
   selectedTagIds: readonly TagId[];
   onCreate: () => void;
@@ -2378,7 +2504,7 @@ interface TagFilterMenuProps {
   onDeleteTag: (tag: Tag) => void;
 }
 
-function TagFilterMenu({
+function TagFilterPills({
   tags,
   selectedTagIds,
   onCreate,
@@ -2386,144 +2512,75 @@ function TagFilterMenu({
   onClear,
   onRenameTag,
   onDeleteTag,
-}: TagFilterMenuProps) {
-  const selectionCount = selectedTagIds.length;
-  const hasSelection = selectionCount > 0;
-  const triggerLabel = hasSelection
-    ? `${selectionCount} tag${selectionCount === 1 ? "" : "s"} filtered`
-    : "Tags";
-
+}: TagFilterPillsProps) {
+  const [open, setOpen] = useState(true);
+  const hasSelection = selectedTagIds.length > 0;
+  const headerLabel = hasSelection && !open ? `Tags (${selectedTagIds.length})` : "Tags";
   return (
-    <Menu>
-      <div className="flex w-full items-center gap-1">
-        <MenuTrigger
-          className="flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-md px-2 text-left text-xs text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground data-popup-open:bg-accent data-popup-open:text-foreground"
-          data-testid="sidebar-tag-filter-trigger"
-        >
-          <TagIcon className="size-3.5 shrink-0 opacity-70" />
-          <span className="flex-1 truncate text-[10px] font-medium uppercase tracking-wider">
-            {triggerLabel}
-          </span>
-          <ChevronDownIcon className="size-3.5 shrink-0 opacity-70" />
-        </MenuTrigger>
-        {hasSelection ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label="Clear tag filter"
-                  data-testid="sidebar-tag-filter-clear"
-                  className="inline-flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
-                  onClick={onClear}
-                />
-              }
-            >
-              <XIcon className="size-3.5" />
-            </TooltipTrigger>
-            <TooltipPopup side="right">Clear filter</TooltipPopup>
-          </Tooltip>
-        ) : null}
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-1">
+          <CollapsibleTrigger
+            data-testid="sidebar-tag-filter-trigger"
+            className="group flex h-6 min-w-0 flex-1 items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <ChevronRightIcon className="size-3 shrink-0 opacity-70 transition-transform duration-150 group-data-panel-open:rotate-90" />
+            <TagIcon className="size-3 shrink-0 opacity-70" />
+            <span className="flex-1 truncate text-[10px] font-medium uppercase tracking-wider">
+              {headerLabel}
+            </span>
+          </CollapsibleTrigger>
+          {hasSelection ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label="Clear tag filter"
+                    data-testid="sidebar-tag-filter-clear"
+                    className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
+                    onClick={onClear}
+                  />
+                }
+              >
+                <XIcon className="size-3" />
+              </TooltipTrigger>
+              <TooltipPopup side="right">Clear filter</TooltipPopup>
+            </Tooltip>
+          ) : null}
+        </div>
+        <CollapsibleContent>
+          <div className="flex flex-wrap gap-1 px-2 pb-0.5">
+            {tags.map((tag) => (
+              <TagFilterPill
+                key={tag.id}
+                tag={tag}
+                pressed={selectedTagIds.includes(tag.id)}
+                onPressedChange={() => onToggleTag(tag.id)}
+                onRename={() => onRenameTag(tag)}
+                onDelete={() => onDeleteTag(tag)}
+              />
+            ))}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label="New tag"
+                    data-testid="sidebar-tag-filter-create"
+                    onClick={onCreate}
+                    className="inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border border-dashed border-input/60 text-muted-foreground/70 transition-colors hover:border-input hover:bg-accent hover:text-foreground sm:h-5 sm:min-w-5"
+                  />
+                }
+              >
+                <PlusIcon className="size-3" />
+              </TooltipTrigger>
+              <TooltipPopup side="right">New tag</TooltipPopup>
+            </Tooltip>
+          </div>
+        </CollapsibleContent>
       </div>
-      <MenuPopup align="start" side="bottom" className="min-w-56">
-        <MenuItem
-          data-testid="sidebar-tag-filter-create"
-          onClick={() => {
-            onCreate();
-          }}
-        >
-          <PlusIcon className="size-3.5" />
-          <span>New tag…</span>
-        </MenuItem>
-        {tags.length > 0 ? (
-          <>
-            <MenuSeparator />
-            <MenuGroup>
-              {tags.map((tag) => {
-                const isSelected = selectedTagIds.includes(tag.id);
-                return (
-                  <MenuSub key={tag.id}>
-                    <MenuSubTrigger
-                      data-testid={`sidebar-tag-filter-item-${tag.id}`}
-                      className="grid min-h-8 grid-cols-[1rem_1fr_auto] items-center gap-2 rounded-sm py-1 ps-2 pe-2 text-base text-foreground outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-popup-open:bg-accent data-highlighted:text-accent-foreground data-popup-open:text-accent-foreground sm:min-h-7 sm:text-sm"
-                    >
-                      <span
-                        className="col-start-1 flex size-4 items-center justify-center"
-                        aria-hidden
-                      >
-                        {isSelected ? (
-                          <svg
-                            fill="none"
-                            height="16"
-                            stroke="currentColor"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            viewBox="0 0 24 24"
-                            width="16"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path d="M5.252 12.7 10.2 18.63 18.748 5.37" />
-                          </svg>
-                        ) : null}
-                      </span>
-                      <button
-                        type="button"
-                        className="col-start-2 cursor-default truncate text-left"
-                        data-testid={`sidebar-tag-filter-toggle-${tag.id}`}
-                        aria-pressed={isSelected}
-                        onClick={(event) => {
-                          // Keep the menu open and toggle the filter rather than
-                          // opening the submenu.
-                          event.stopPropagation();
-                          onToggleTag(tag.id);
-                        }}
-                      >
-                        {tag.name}
-                      </button>
-                      {/*
-                        MenuSubTrigger automatically appends its own ChevronRightIcon
-                        after `children`. CSS-grid auto-placement will land it in
-                        the third column thanks to our `grid-cols-[1rem_1fr_auto]`
-                        track, so we must NOT render an additional chevron here
-                        (doing so would push the auto-appended one onto a new
-                        row, producing a duplicate arrow below the row).
-                      */}
-                    </MenuSubTrigger>
-                    <MenuSubPopup className="min-w-32">
-                      <MenuItem
-                        onClick={() => {
-                          onRenameTag(tag);
-                        }}
-                      >
-                        Rename…
-                      </MenuItem>
-                      <MenuItem
-                        variant="destructive"
-                        onClick={() => {
-                          onDeleteTag(tag);
-                        }}
-                      >
-                        Delete
-                      </MenuItem>
-                    </MenuSubPopup>
-                  </MenuSub>
-                );
-              })}
-            </MenuGroup>
-          </>
-        ) : null}
-        <MenuSeparator />
-        <MenuItem
-          disabled={!hasSelection}
-          onClick={() => {
-            onClear();
-          }}
-        >
-          Clear filter
-        </MenuItem>
-      </MenuPopup>
-    </Menu>
+    </Collapsible>
   );
 }
 
@@ -2896,7 +2953,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
         </SidebarGroup>
       ) : null}
       <SidebarGroup className="px-2 pt-2 pb-1">
-        <TagFilterMenu
+        <TagFilterPills
           tags={tagsForSidebar}
           selectedTagIds={selectedTagIds}
           onCreate={onOpenTagCreateDialog}
