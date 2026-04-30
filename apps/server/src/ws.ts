@@ -280,6 +280,26 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
                 threadId: event.payload.threadId,
               }),
             );
+          case "tag.created":
+          case "tag.renamed":
+            return projectionSnapshotQuery.getTagById(event.payload.tagId).pipe(
+              Effect.map((tag) =>
+                Option.map(tag, (nextTag) => ({
+                  kind: "tag-upserted" as const,
+                  sequence: event.sequence,
+                  tag: nextTag,
+                })),
+              ),
+              Effect.catch(() => Effect.succeed(Option.none())),
+            );
+          case "tag.deleted":
+            return Effect.succeed(
+              Option.some({
+                kind: "tag-removed" as const,
+                sequence: event.sequence,
+                tagId: event.payload.tagId,
+              }),
+            );
           default:
             if (event.aggregateKind !== "thread") {
               return Effect.succeed(Option.none());
@@ -509,6 +529,8 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           );
       };
 
+      const availableEditors = resolveAvailableEditors();
+
       const loadServerConfig = Effect.gen(function* () {
         const keybindingsConfig = yield* keybindings.loadConfigState;
         const providers = yield* providerRegistry.getProviders;
@@ -524,7 +546,7 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           keybindings: keybindingsConfig.keybindings,
           issues: keybindingsConfig.issues,
           providers,
-          availableEditors: resolveAvailableEditors(),
+          availableEditors,
           observability: {
             logsDirectoryPath: config.logsDir,
             localTracingEnabled: true,

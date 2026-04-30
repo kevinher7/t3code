@@ -77,6 +77,7 @@ export interface PrContentPromptInput {
   commitSummary: string;
   diffSummary: string;
   diffPatch: string;
+  prTemplate?: string | undefined;
 }
 
 export function buildPrContentPrompt(input: PrContentPromptInput) {
@@ -100,6 +101,9 @@ export function buildPrContentPrompt(input: PrContentPromptInput) {
     "",
     "Diff patch:",
     limitSection(input.diffPatch, 40_000),
+    ...(input.prTemplate
+      ? ["", "PR Template (follow this structure for the body):", input.prTemplate]
+      : []),
   ].join("\n");
 
   const outputSchema = Schema.Struct({
@@ -117,6 +121,7 @@ export function buildPrContentPrompt(input: PrContentPromptInput) {
 export interface BranchNamePromptInput {
   message: string;
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
+  username?: string | undefined;
 }
 
 interface PromptFromMessageInput {
@@ -153,13 +158,15 @@ function buildPromptFromMessage(input: PromptFromMessageInput): string {
 }
 
 export function buildBranchNamePrompt(input: BranchNamePromptInput) {
+  const userSegment = input.username ? `/${input.username}` : "";
   const prompt = buildPromptFromMessage({
     instruction: "You generate concise git branch names.",
     responseShape: "Return a JSON object with key: branch.",
     rules: [
-      "Branch should describe the requested work from the user message.",
-      "Keep it short and specific (2-6 words).",
-      "Use plain words only, no issue prefixes and no punctuation-heavy text.",
+      "Branch must start with a type prefix: feature, fix, chore, docs, refactor, or test.",
+      `Format: <type>${userSegment}/<slug>`,
+      "Slug should describe the requested work in 2-5 words.",
+      "Use plain lowercase words only, no issue numbers, no punctuation beyond hyphens and slashes.",
       "If images are attached, use them as primary context for visual/UI issues.",
     ],
     message: input.message,

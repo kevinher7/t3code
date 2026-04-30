@@ -429,6 +429,7 @@ const makeOpenCodeTextGeneration = Effect.gen(function* () {
       commitSummary: input.commitSummary,
       diffSummary: input.diffSummary,
       diffPatch: input.diffPatch,
+      prTemplate: input.prTemplate,
     });
     const generated = yield* runOpenCodeJson({
       operation: "generatePrContent",
@@ -457,6 +458,7 @@ const makeOpenCodeTextGeneration = Effect.gen(function* () {
     const { prompt, outputSchema } = buildBranchNamePrompt({
       message: input.message,
       attachments: input.attachments,
+      username: input.username,
     });
     const generated = yield* runOpenCodeJson({
       operation: "generateBranchName",

@@ -321,6 +321,7 @@ const makeCodexTextGeneration = Effect.gen(function* () {
       commitSummary: input.commitSummary,
       diffSummary: input.diffSummary,
       diffPatch: input.diffPatch,
+      prTemplate: input.prTemplate,
     });
 
     if (input.modelSelection.provider !== "codex") {
@@ -354,6 +355,7 @@ const makeCodexTextGeneration = Effect.gen(function* () {
     const { prompt, outputSchema } = buildBranchNamePrompt({
       message: input.message,
       attachments: input.attachments,
+      username: input.username,
     });
 
     if (input.modelSelection.provider !== "codex") {

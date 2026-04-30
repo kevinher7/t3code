@@ -2,8 +2,10 @@ import type {
   OrchestrationCommand,
   OrchestrationProject,
   OrchestrationReadModel,
+  OrchestrationTagCatalogEntry,
   OrchestrationThread,
   ProjectId,
+  TagId,
   ThreadId,
 } from "@t3tools/contracts";
 import { Effect } from "effect";
@@ -29,6 +31,21 @@ export function findProjectById(
   projectId: ProjectId,
 ): OrchestrationProject | undefined {
   return readModel.projects.find((project) => project.id === projectId);
+}
+
+export function findTagById(
+  readModel: OrchestrationReadModel,
+  tagId: TagId,
+): OrchestrationTagCatalogEntry | undefined {
+  return readModel.tags.find((tag) => tag.id === tagId);
+}
+
+export function normalizeTagName(name: string): string {
+  return name.trim();
+}
+
+export function normalizeTagNameForDedup(name: string): string {
+  return normalizeTagName(name).toLocaleLowerCase();
 }
 
 export function listThreadsByProjectId(
@@ -156,4 +173,60 @@ export function requireNonNegativeInteger(input: {
       `${input.field} must be an integer greater than or equal to 0.`,
     ),
   );
+}
+
+export function requireTag(input: {
+  readonly readModel: OrchestrationReadModel;
+  readonly command: OrchestrationCommand;
+  readonly tagId: TagId;
+}): Effect.Effect<OrchestrationTagCatalogEntry, OrchestrationCommandInvariantError> {
+  const tag = findTagById(input.readModel, input.tagId);
+  if (tag) {
+    return Effect.succeed(tag);
+  }
+  return Effect.fail(
+    invariantError(
+      input.command.type,
+      `Tag '${input.tagId}' does not exist for command '${input.command.type}'.`,
+    ),
+  );
+}
+
+export function requireTagNameAvailable(input: {
+  readonly readModel: OrchestrationReadModel;
+  readonly command: OrchestrationCommand;
+  readonly name: string;
+  readonly ignoreTagId?: TagId;
+}): Effect.Effect<void, OrchestrationCommandInvariantError> {
+  const dedupKey = normalizeTagNameForDedup(input.name);
+  for (const tag of input.readModel.tags) {
+    if (input.ignoreTagId !== undefined && tag.id === input.ignoreTagId) {
+      continue;
+    }
+    if (normalizeTagNameForDedup(tag.name) === dedupKey) {
+      return Effect.fail(
+        invariantError(
+          input.command.type,
+          `Tag name '${normalizeTagName(input.name)}' is already in use by tag '${tag.id}'.`,
+        ),
+      );
+    }
+  }
+  return Effect.void;
+}
+
+export function requireTagsExist(input: {
+  readonly readModel: OrchestrationReadModel;
+  readonly command: OrchestrationCommand;
+  readonly tagIds: ReadonlyArray<TagId>;
+}): Effect.Effect<void, OrchestrationCommandInvariantError> {
+  const knownIds = new Set<TagId>(input.readModel.tags.map((tag) => tag.id));
+  for (const tagId of input.tagIds) {
+    if (!knownIds.has(tagId)) {
+      return Effect.fail(
+        invariantError(input.command.type, `Tag '${tagId}' does not exist in the catalog.`),
+      );
+    }
+  }
+  return Effect.void;
 }

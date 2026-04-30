@@ -52,6 +52,7 @@ function makeProject(
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     scripts: [],
+    tags: [],
     ...overrides,
   };
 }
@@ -81,6 +82,8 @@ function makeEmptyEnvironmentState(): EnvironmentState {
   return {
     projectIds: [],
     projectById: {},
+    tagIds: [],
+    tagById: {},
     threadIds: [],
     threadIdsByProjectId: {},
     threadShellById: {},

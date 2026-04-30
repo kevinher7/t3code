@@ -11,12 +11,14 @@ import type {
   OrchestrationShellStreamEvent,
   OrchestrationSession,
   OrchestrationSessionStatus,
+  OrchestrationTagCatalogEntry,
   OrchestrationThread,
   OrchestrationThreadShell,
   OrchestrationThreadActivity,
   ProjectId,
   ScopedProjectRef,
   ScopedThreadRef,
+  TagId,
 } from "@t3tools/contracts";
 import { ProviderKind } from "@t3tools/contracts";
 import type { ThreadId, TurnId } from "@t3tools/contracts";
@@ -28,6 +30,7 @@ import {
   type Project,
   type ProposedPlan,
   type SidebarThreadSummary,
+  type Tag,
   type Thread,
   type ThreadSession,
   type ThreadShell,
@@ -37,10 +40,14 @@ import {
 import { resolveEnvironmentHttpUrl } from "./environments/runtime";
 import { sanitizeThreadErrorMessage } from "./rpc/transportError";
 import { getThreadFromEnvironmentState } from "./threadDerivation";
+import { useUiStateStore } from "./uiStateStore";
 
 export interface EnvironmentState {
   projectIds: ProjectId[];
   projectById: Record<ProjectId, Project>;
+
+  tagIds: TagId[];
+  tagById: Record<TagId, Tag>;
 
   // ---------------------------------------------------------------------------
   // Thread bookkeeping — written by BOTH shell stream and detail stream.
@@ -97,6 +104,8 @@ export interface AppState {
 const initialEnvironmentState: EnvironmentState = {
   projectIds: [],
   projectById: {},
+  tagIds: [],
+  tagById: {},
   threadIds: [],
   threadIdsByProjectId: {},
   threadShellById: {},
@@ -221,6 +230,17 @@ function mapProject(
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
     scripts: mapProjectScripts(project.scripts),
+    tags: [...project.tags],
+  };
+}
+
+function mapTag(tag: OrchestrationTagCatalogEntry, environmentId: EnvironmentId): Tag {
+  return {
+    id: tag.id,
+    environmentId,
+    name: tag.name,
+    createdAt: tag.createdAt,
+    updatedAt: tag.updatedAt,
   };
 }
 
@@ -1038,6 +1058,13 @@ function buildProjectState(
   };
 }
 
+function buildTagState(tags: ReadonlyArray<Tag>): Pick<EnvironmentState, "tagIds" | "tagById"> {
+  return {
+    tagIds: tags.map((tag) => tag.id),
+    tagById: Object.fromEntries(tags.map((tag) => [tag.id, tag] as const)) as Record<TagId, Tag>,
+  };
+}
+
 function getStoredEnvironmentState(
   state: AppState,
   environmentId: EnvironmentId,
@@ -1075,10 +1102,12 @@ function syncEnvironmentShellSnapshot(
   environmentId: EnvironmentId,
 ): EnvironmentState {
   const nextProjects = snapshot.projects.map((project) => mapProject(project, environmentId));
+  const nextTags = snapshot.tags.map((tag) => mapTag(tag, environmentId));
   const nextThreadIds = new Set(snapshot.threads.map((thread) => thread.id));
   let nextState: EnvironmentState = {
     ...state,
     ...buildProjectState(nextProjects),
+    ...buildTagState(nextTags),
     threadIds: [],
     threadIdsByProjectId: {},
     threadShellById: {},
@@ -1154,6 +1183,7 @@ function applyEnvironmentOrchestrationEvent(
           repositoryIdentity: event.payload.repositoryIdentity ?? null,
           defaultModelSelection: event.payload.defaultModelSelection,
           scripts: event.payload.scripts,
+          tags: event.payload.tags,
           createdAt: event.payload.createdAt,
           updatedAt: event.payload.updatedAt,
           deletedAt: null,
@@ -1218,6 +1248,7 @@ function applyEnvironmentOrchestrationEvent(
         ...(event.payload.scripts !== undefined
           ? { scripts: mapProjectScripts(event.payload.scripts) }
           : {}),
+        ...(event.payload.tags !== undefined ? { tags: [...event.payload.tags] } : {}),
         updatedAt: event.payload.updatedAt,
       };
       return {
@@ -1687,6 +1718,38 @@ function applyEnvironmentShellEvent(
       return writeThreadShellState(state, mapThreadShell(event.thread, environmentId));
     case "thread-removed":
       return removeThreadState(state, event.threadId);
+    case "tag-upserted": {
+      const nextTag = mapTag(event.tag, environmentId);
+      const tagById = {
+        ...state.tagById,
+        [nextTag.id]: nextTag,
+      };
+      const tagIds = state.tagIds.includes(nextTag.id)
+        ? state.tagIds
+        : [...state.tagIds, nextTag.id];
+      return {
+        ...state,
+        tagById,
+        tagIds,
+      };
+    }
+    case "tag-removed": {
+      if (!state.tagById[event.tagId]) {
+        return state;
+      }
+      const { [event.tagId]: _removedTag, ...tagById } = state.tagById;
+      // Schedule a microtask to clear the device-only filter selection without
+      // recursing into another store update during this reducer's commit phase.
+      const removedTagId = event.tagId;
+      queueMicrotask(() => {
+        useUiStateStore.getState().clearProjectTagFilterTagId(removedTagId);
+      });
+      return {
+        ...state,
+        tagById,
+        tagIds: removeId(state.tagIds, event.tagId),
+      };
+    }
   }
 }
 
@@ -1739,6 +1802,21 @@ export function selectProjectsAcrossEnvironments(state: AppState): Project[] {
   return getEnvironmentEntries(state).flatMap(([, environmentState]) =>
     getProjects(environmentState),
   );
+}
+
+export function selectTagsAcrossEnvironments(state: AppState): Tag[] {
+  const seen = new Map<TagId, Tag>();
+  for (const [, environmentState] of getEnvironmentEntries(state)) {
+    for (const tagId of environmentState.tagIds) {
+      const tag = environmentState.tagById[tagId];
+      if (!tag) continue;
+      const existing = seen.get(tagId);
+      if (!existing || existing.updatedAt < tag.updatedAt) {
+        seen.set(tagId, tag);
+      }
+    }
+  }
+  return [...seen.values()];
 }
 
 export function selectThreadsAcrossEnvironments(state: AppState): Thread[] {
