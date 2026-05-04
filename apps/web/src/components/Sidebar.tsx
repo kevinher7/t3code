@@ -42,6 +42,7 @@ import {
   ProjectId,
   type ScopedThreadRef,
   type SidebarProjectGroupingMode,
+  TagId,
   type ThreadEnvMode,
   ThreadId,
 } from "@t3tools/contracts";
@@ -67,6 +68,7 @@ import {
   selectProjectsAcrossEnvironments,
   selectSidebarThreadsForProjectRefs,
   selectSidebarThreadsAcrossEnvironments,
+  selectTagsAcrossEnvironments,
   selectThreadByRef,
   useStore,
 } from "../store";
@@ -150,6 +152,7 @@ import {
   getSidebarThreadIdsToPrewarm,
   resolveAdjacentThreadId,
   isContextMenuPointerDown,
+  filterProjectSnapshotsByTags,
   resolveProjectStatusIndicator,
   resolveSidebarNewThreadSeedContext,
   resolveSidebarNewThreadEnvMode,
@@ -158,11 +161,16 @@ import {
   orderItemsByPreferredIds,
   shouldClearThreadSelectionOnMouseDown,
   sortProjectsForSidebar,
+  toggleProjectTagAssignment,
+  toggleTagFilterSelection,
   useThreadJumpHintVisibility,
   ThreadStatusPill,
 } from "./Sidebar.logic";
 import { sortThreads } from "../lib/threadSort";
-import { SidebarUpdatePill } from "./sidebar/SidebarUpdatePill";
+import { ProjectTagsEditor } from "./ProjectTagsEditor";
+import { SidebarSectionHeader } from "./SidebarSectionHeader";
+import { SidebarTagFilter } from "./SidebarTagFilter";
+import { SidebarUpdatePill } from "./SidebarUpdatePill";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { CommandDialogTrigger } from "./ui/command";
 import { readEnvironmentApi } from "../environmentApi";
@@ -177,7 +185,7 @@ import {
   useSavedEnvironmentRegistryStore,
   useSavedEnvironmentRuntimeStore,
 } from "../environments/runtime";
-import type { SidebarThreadSummary } from "../types";
+import type { SidebarThreadSummary, Tag } from "../types";
 import {
   buildPhysicalToLogicalProjectKeyMap,
   buildSidebarProjectSnapshots,
@@ -892,6 +900,10 @@ interface SidebarProjectItemProps {
   suppressProjectClickForContextMenuRef: React.RefObject<boolean>;
   isManualProjectSorting: boolean;
   dragHandleProps: SortableProjectHandleProps | null;
+  onOpenEditTagsForMember: (
+    member: SidebarProjectGroupMember,
+    position: { x: number; y: number },
+  ) => void;
 }
 
 const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjectItemProps) {
@@ -912,6 +924,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
     suppressProjectClickForContextMenuRef,
     isManualProjectSorting,
     dragHandleProps,
+    onOpenEditTagsForMember,
   } = props;
   const threadSortOrder = useSettings<SidebarThreadSortOrder>(
     (settings) => settings.sidebarThreadSortOrder,
@@ -1480,19 +1493,48 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
           };
         };
 
+        const clickPosition = {
+          x: event.clientX,
+          y: event.clientY,
+        };
+
+        // Build an "Edit tags…" entry alongside the existing actions. When the
+        // project group has multiple physical members, expose one submenu leaf
+        // per member so the user can pick which physical project to retag.
+        const editTagsActionId = "edit-tags";
+        const editTagsLeaf = (member: SidebarProjectGroupMember): ContextMenuItem<string> => {
+          const id = `${editTagsActionId}:${member.physicalProjectKey}`;
+          actionHandlers.set(id, () => {
+            onOpenEditTagsForMember(member, clickPosition);
+          });
+          return {
+            id,
+            label: formatProjectMemberActionLabel(member, project.groupedProjectCount),
+          };
+        };
+        const editTagsItem: ContextMenuItem<string> =
+          project.memberProjects.length === 1
+            ? {
+                ...editTagsLeaf(project.memberProjects[0]!),
+                label: "Edit tags…",
+              }
+            : {
+                id: `${editTagsActionId}:submenu`,
+                label: "Edit tags…",
+                children: project.memberProjects.map(editTagsLeaf),
+              };
+
         const clicked = await api.contextMenu.show(
           [
             buildTargetedItem("rename", "Rename project"),
+            editTagsItem,
             buildTargetedItem("grouping", "Project grouping…"),
             buildTargetedItem("copy-path", "Copy Project Path"),
             buildTargetedItem("delete", "Remove project", {
               destructive: true,
             }),
           ],
-          {
-            x: event.clientX,
-            y: event.clientY,
-          },
+          clickPosition,
         );
 
         if (!clicked) {
@@ -1505,6 +1547,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
     [
       copyPathToClipboard,
       handleRemoveProject,
+      onOpenEditTagsForMember,
       openProjectGroupingDialog,
       openProjectRenameDialog,
       project.groupedProjectCount,
@@ -2437,6 +2480,17 @@ interface SidebarProjectsContentProps {
   projectGroupingMode: SidebarProjectGroupingMode;
   updateSettings: ReturnType<typeof useUpdateSettings>["updateSettings"];
   openAddProject: () => void;
+  tagsForSidebar: readonly Tag[];
+  selectedTagIds: readonly TagId[];
+  onTagFilterToggle: (tagId: TagId) => void;
+  onClearTagFilter: () => void;
+  onOpenTagCreateDialog: () => void;
+  onRenameTag: (tag: Tag) => void;
+  onDeleteTag: (tag: Tag) => void;
+  onOpenEditTagsForMember: (
+    member: SidebarProjectGroupMember,
+    position: { x: number; y: number },
+  ) => void;
   isManualProjectSorting: boolean;
   projectDnDSensors: ReturnType<typeof useSensors>;
   projectCollisionDetection: CollisionDetection;
@@ -2477,6 +2531,14 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
     projectGroupingMode,
     updateSettings,
     openAddProject,
+    tagsForSidebar,
+    selectedTagIds,
+    onTagFilterToggle,
+    onClearTagFilter,
+    onOpenTagCreateDialog,
+    onRenameTag,
+    onDeleteTag,
+    onOpenEditTagsForMember,
     isManualProjectSorting,
     projectDnDSensors,
     projectCollisionDetection,
@@ -2571,37 +2633,43 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
         </SidebarGroup>
       ) : null}
       <SidebarGroup className="px-2 py-2">
-        <div className="mb-1 flex items-center justify-between pl-2 pr-1.5">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-            Projects
-          </span>
-          <div className="flex items-center gap-1">
-            <ProjectSortMenu
-              projectSortOrder={projectSortOrder}
-              threadSortOrder={threadSortOrder}
-              projectGroupingMode={projectGroupingMode}
-              onProjectSortOrderChange={handleProjectSortOrderChange}
-              onThreadSortOrderChange={handleThreadSortOrderChange}
-              onProjectGroupingModeChange={handleProjectGroupingModeChange}
-            />
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    aria-label="Add project"
-                    data-testid="sidebar-add-project-trigger"
-                    className="inline-flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
-                    onClick={openAddProject}
-                  />
-                }
-              >
-                <PlusIcon className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipPopup side="right">Add project</TooltipPopup>
-            </Tooltip>
-          </div>
-        </div>
+        <SidebarTagFilter
+          tags={tagsForSidebar}
+          selectedTagIds={selectedTagIds}
+          onCreate={onOpenTagCreateDialog}
+          onToggleTag={onTagFilterToggle}
+          onClear={onClearTagFilter}
+          onRenameTag={onRenameTag}
+          onDeleteTag={onDeleteTag}
+        />
+      </SidebarGroup>
+      <SidebarGroup className="px-2 py-2">
+        <SidebarSectionHeader label="Projects">
+          <ProjectSortMenu
+            projectSortOrder={projectSortOrder}
+            threadSortOrder={threadSortOrder}
+            projectGroupingMode={projectGroupingMode}
+            onProjectSortOrderChange={handleProjectSortOrderChange}
+            onThreadSortOrderChange={handleThreadSortOrderChange}
+            onProjectGroupingModeChange={handleProjectGroupingModeChange}
+          />
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label="Add project"
+                  data-testid="sidebar-add-project-trigger"
+                  className="inline-flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
+                  onClick={openAddProject}
+                />
+              }
+            >
+              <PlusIcon className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipPopup side="right">Add project</TooltipPopup>
+          </Tooltip>
+        </SidebarSectionHeader>
 
         {isManualProjectSorting ? (
           <DndContext
@@ -2641,6 +2709,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
                         }
                         isManualProjectSorting={isManualProjectSorting}
                         dragHandleProps={dragHandleProps}
+                        onOpenEditTagsForMember={onOpenEditTagsForMember}
                       />
                     )}
                   </SortableProjectItem>
@@ -2671,6 +2740,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
                 suppressProjectClickForContextMenuRef={suppressProjectClickForContextMenuRef}
                 isManualProjectSorting={isManualProjectSorting}
                 dragHandleProps={null}
+                onOpenEditTagsForMember={onOpenEditTagsForMember}
               />
             ))}
           </SidebarMenu>
@@ -2688,10 +2758,232 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
 
 export default function Sidebar() {
   const projects = useStore(useShallow(selectProjectsAcrossEnvironments));
+  const tagsForSidebar = useStore(useShallow(selectTagsAcrossEnvironments));
   const sidebarThreads = useStore(useShallow(selectSidebarThreadsAcrossEnvironments));
   const projectExpandedById = useUiStateStore((store) => store.projectExpandedById);
   const projectOrder = useUiStateStore((store) => store.projectOrder);
   const reorderProjects = useUiStateStore((store) => store.reorderProjects);
+  const selectedTagIds = useUiStateStore((store) => store.projectTagFilter.selectedTagIds);
+  const setProjectTagFilterSelection = useUiStateStore(
+    (store) => store.setProjectTagFilterSelection,
+  );
+  const clearProjectTagFilterTagId = useUiStateStore((store) => store.clearProjectTagFilterTagId);
+  const [tagCreateDialogOpen, setTagCreateDialogOpen] = useState(false);
+  const [tagCreateName, setTagCreateName] = useState("");
+  const [tagRenameTarget, setTagRenameTarget] = useState<Tag | null>(null);
+  const [tagRenameName, setTagRenameName] = useState("");
+  const [editTagsAnchor, setEditTagsAnchor] = useState<{
+    member: SidebarProjectGroupMember;
+    x: number;
+    y: number;
+  } | null>(null);
+  const handleTagFilterToggle = useCallback(
+    (tagId: TagId) => {
+      setProjectTagFilterSelection(toggleTagFilterSelection(selectedTagIds, tagId));
+    },
+    [selectedTagIds, setProjectTagFilterSelection],
+  );
+  const handleClearTagFilter = useCallback(() => {
+    setProjectTagFilterSelection([]);
+  }, [setProjectTagFilterSelection]);
+  const handleRenameTag = useCallback((tag: Tag) => {
+    setTagRenameTarget(tag);
+    setTagRenameName(tag.name);
+  }, []);
+  const handleOpenEditTagsForMember = useCallback(
+    (member: SidebarProjectGroupMember, position: { x: number; y: number }) => {
+      setEditTagsAnchor({ member, x: position.x, y: position.y });
+    },
+    [],
+  );
+  const handleCloseEditTags = useCallback(() => {
+    setEditTagsAnchor(null);
+  }, []);
+  const openTagCreateDialog = useCallback(() => {
+    setTagCreateName("");
+    setTagCreateDialogOpen(true);
+  }, []);
+  const closeTagCreateDialog = useCallback(() => {
+    setTagCreateDialogOpen(false);
+    setTagCreateName("");
+  }, []);
+  const closeTagRenameDialog = useCallback(() => {
+    setTagRenameTarget(null);
+    setTagRenameName("");
+  }, []);
+  const submitTagCreate = useCallback(async () => {
+    const trimmed = tagCreateName.trim();
+    if (trimmed.length === 0) {
+      toastManager.add({ type: "warning", title: "Tag name cannot be empty" });
+      return;
+    }
+    const environmentIds = Array.from(new Set(projects.map((project) => project.environmentId)));
+    if (environmentIds.length === 0) {
+      toastManager.add({
+        type: "warning",
+        title: "No environments available",
+        description: "Connect to at least one environment before creating tags.",
+      });
+      return;
+    }
+    const sharedTagId = TagId.make(crypto.randomUUID());
+    const createdAt = new Date().toISOString();
+    const failures: string[] = [];
+    for (const environmentId of environmentIds) {
+      const api = readEnvironmentApi(environmentId);
+      if (!api) {
+        failures.push(environmentId);
+        continue;
+      }
+      try {
+        await api.orchestration.dispatchCommand({
+          type: "tag.create",
+          commandId: newCommandId(),
+          tagId: sharedTagId,
+          name: trimmed,
+          createdAt,
+        });
+      } catch (error) {
+        failures.push(
+          `${environmentId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    if (failures.length === environmentIds.length) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Failed to create tag",
+          description: failures.join("\n"),
+        }),
+      );
+      return;
+    }
+    closeTagCreateDialog();
+  }, [closeTagCreateDialog, projects, tagCreateName]);
+  const submitTagRename = useCallback(async () => {
+    if (!tagRenameTarget) {
+      return;
+    }
+    const trimmed = tagRenameName.trim();
+    if (trimmed.length === 0) {
+      toastManager.add({ type: "warning", title: "Tag name cannot be empty" });
+      return;
+    }
+    if (trimmed === tagRenameTarget.name) {
+      closeTagRenameDialog();
+      return;
+    }
+    const environmentIds = Array.from(new Set(projects.map((project) => project.environmentId)));
+    const failures: string[] = [];
+    for (const environmentId of environmentIds) {
+      const api = readEnvironmentApi(environmentId);
+      if (!api) {
+        failures.push(environmentId);
+        continue;
+      }
+      try {
+        await api.orchestration.dispatchCommand({
+          type: "tag.rename",
+          commandId: newCommandId(),
+          tagId: tagRenameTarget.id,
+          name: trimmed,
+        });
+      } catch (error) {
+        failures.push(
+          `${environmentId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    if (failures.length === environmentIds.length) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Failed to rename tag",
+          description: failures.join("\n"),
+        }),
+      );
+      return;
+    }
+    closeTagRenameDialog();
+  }, [closeTagRenameDialog, projects, tagRenameName, tagRenameTarget]);
+  const handleDeleteTag = useCallback(
+    async (tag: Tag) => {
+      // Optimistically clear the tag from the local filter selection so that the
+      // sidebar trigger label updates immediately. The server-side
+      // `tag-removed` shell-stream handler also clears it; this is a
+      // belt-and-braces fast path so the UI doesn't briefly show a count
+      // referencing a deleted tag.
+      clearProjectTagFilterTagId(tag.id);
+      const environmentIds = Array.from(new Set(projects.map((project) => project.environmentId)));
+      const failures: string[] = [];
+      for (const environmentId of environmentIds) {
+        const api = readEnvironmentApi(environmentId);
+        if (!api) {
+          failures.push(environmentId);
+          continue;
+        }
+        try {
+          await api.orchestration.dispatchCommand({
+            type: "tag.delete",
+            commandId: newCommandId(),
+            tagId: tag.id,
+          });
+        } catch (error) {
+          failures.push(
+            `${environmentId}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+      if (failures.length === environmentIds.length && environmentIds.length > 0) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: `Failed to delete "${tag.name}"`,
+            description: failures.join("\n"),
+          }),
+        );
+      }
+    },
+    [clearProjectTagFilterTagId, projects],
+  );
+  const handleToggleProjectTagAssignment = useCallback(
+    async (tagId: TagId, _nextChecked: boolean) => {
+      const anchor = editTagsAnchor;
+      if (!anchor) {
+        return;
+      }
+      const nextTagIds = toggleProjectTagAssignment(anchor.member.tags, tagId);
+      const api = readEnvironmentApi(anchor.member.environmentId);
+      if (!api) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: `Failed to update tags for "${anchor.member.name}"`,
+            description: "Project API unavailable.",
+          }),
+        );
+        return;
+      }
+      try {
+        await api.orchestration.dispatchCommand({
+          type: "project.meta.update",
+          commandId: newCommandId(),
+          projectId: anchor.member.id,
+          tags: nextTagIds,
+        });
+      } catch (error) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: `Failed to update tags for "${anchor.member.name}"`,
+            description: error instanceof Error ? error.message : "An error occurred.",
+          }),
+        );
+      }
+    },
+    [editTagsAnchor],
+  );
   const navigate = useNavigate();
   const pathname = useLocation({ select: (loc) => loc.pathname });
   const isOnSettings = pathname.startsWith("/settings");
@@ -2938,10 +3230,10 @@ export default function Sidebar() {
     [sidebarThreads],
   );
   const sortedProjects = useMemo(() => {
-    const sortableProjects = sidebarProjects.map((project) => ({
-      ...project,
-      id: project.projectKey,
-    }));
+    const filteredSidebarProjects = filterProjectSnapshotsByTags(sidebarProjects, selectedTagIds);
+    const sortableProjects = filteredSidebarProjects.map((project) =>
+      Object.assign({}, project, { id: project.projectKey }),
+    );
     const sortableThreads = visibleThreads.map((thread) => {
       const physicalKey =
         projectPhysicalKeyByScopedRef.get(
@@ -2967,6 +3259,7 @@ export default function Sidebar() {
     sidebarProjectByKey,
     sidebarProjects,
     visibleThreads,
+    selectedTagIds,
   ]);
   const isManualProjectSorting = sidebarProjectSortOrder === "manual";
   const visibleSidebarThreadKeys = useMemo(
@@ -3329,6 +3622,14 @@ export default function Sidebar() {
             projectGroupingMode={sidebarProjectGroupingMode}
             updateSettings={updateSettings}
             openAddProject={openAddProjectCommandPalette}
+            tagsForSidebar={tagsForSidebar}
+            selectedTagIds={selectedTagIds}
+            onTagFilterToggle={handleTagFilterToggle}
+            onClearTagFilter={handleClearTagFilter}
+            onOpenTagCreateDialog={openTagCreateDialog}
+            onRenameTag={handleRenameTag}
+            onDeleteTag={handleDeleteTag}
+            onOpenEditTagsForMember={handleOpenEditTagsForMember}
             isManualProjectSorting={isManualProjectSorting}
             projectDnDSensors={projectDnDSensors}
             projectCollisionDetection={projectCollisionDetection}
@@ -3359,6 +3660,100 @@ export default function Sidebar() {
           <SidebarChromeFooter />
         </>
       )}
+      <Dialog
+        open={tagCreateDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeTagCreateDialog();
+          }
+        }}
+      >
+        <DialogPopup className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>New tag</DialogTitle>
+            <DialogDescription>
+              Tags are shared across projects in the catalog and used to filter the project list.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel className="space-y-4">
+            <div className="grid gap-1.5">
+              <span className="text-xs font-medium text-foreground">Tag name</span>
+              <Input
+                aria-label="Tag name"
+                value={tagCreateName}
+                onChange={(event) => setTagCreateName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void submitTagCreate();
+                  }
+                }}
+                data-testid="sidebar-tag-create-input"
+              />
+            </div>
+          </DialogPanel>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeTagCreateDialog}>
+              Cancel
+            </Button>
+            <Button onClick={() => void submitTagCreate()}>Create</Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+      <Dialog
+        open={tagRenameTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeTagRenameDialog();
+          }
+        }}
+      >
+        <DialogPopup className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename tag</DialogTitle>
+            <DialogDescription>
+              {tagRenameTarget
+                ? `Update the name of "${tagRenameTarget.name}".`
+                : "Update the tag name."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel className="space-y-4">
+            <div className="grid gap-1.5">
+              <span className="text-xs font-medium text-foreground">Tag name</span>
+              <Input
+                aria-label="Tag name"
+                value={tagRenameName}
+                onChange={(event) => setTagRenameName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void submitTagRename();
+                  }
+                }}
+                data-testid="sidebar-tag-rename-input"
+              />
+            </div>
+          </DialogPanel>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeTagRenameDialog}>
+              Cancel
+            </Button>
+            <Button onClick={() => void submitTagRename()}>Save</Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+      {editTagsAnchor !== null ? (
+        <ProjectTagsEditor
+          projectMember={editTagsAnchor.member}
+          tags={tagsForSidebar}
+          anchor={{ x: editTagsAnchor.x, y: editTagsAnchor.y }}
+          onClose={handleCloseEditTags}
+          onToggleAssignment={(tagId, nextChecked) => {
+            void handleToggleProjectTagAssignment(tagId, nextChecked);
+          }}
+          onCreateTag={openTagCreateDialog}
+        />
+      ) : null}
     </>
   );
 }

@@ -125,11 +125,13 @@ function createMinimalSnapshot(): OrchestrationReadModel {
           model: "gpt-5",
         },
         scripts: [],
+        tags: [],
         createdAt: NOW_ISO,
         updatedAt: NOW_ISO,
         deletedAt: null,
       },
     ],
+    tags: [],
     threads: [
       {
         id: THREAD_ID,

@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { TagId } from "@t3tools/contracts";
 import type { SidebarProjectSortOrder, SidebarThreadSortOrder } from "@t3tools/contracts/settings";
 import {
   getThreadSortTimestamp,
@@ -6,6 +7,7 @@ import {
   toSortableTimestamp,
   type ThreadSortInput,
 } from "../lib/threadSort";
+import type { SidebarProjectSnapshot } from "../sidebarProjectGrouping";
 import type { SidebarThreadSummary, Thread } from "../types";
 import { cn } from "../lib/utils";
 import { isLatestTurnSettled } from "../session-logic";
@@ -538,4 +540,41 @@ export function sortProjectsForSidebar<
     if (byTimestamp !== 0) return byTimestamp;
     return left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
   });
+}
+
+export function filterProjectSnapshotsByTags(
+  snapshots: readonly SidebarProjectSnapshot[],
+  selectedTagIds: readonly TagId[],
+): SidebarProjectSnapshot[] {
+  if (selectedTagIds.length === 0) {
+    return [...snapshots];
+  }
+  return snapshots.filter((snapshot) => {
+    const memberTagIds = new Set(snapshot.displayTagIds);
+    return selectedTagIds.every((tagId) => memberTagIds.has(tagId));
+  });
+}
+
+export function toggleTagFilterSelection(selected: readonly TagId[], tagId: TagId): TagId[] {
+  return selected.includes(tagId) ? selected.filter((id) => id !== tagId) : [...selected, tagId];
+}
+
+/**
+ * Returns the new tag-id array for a `project.meta.update` payload after toggling
+ * `tagId` on the given project. Removing an already-assigned tag preserves the
+ * relative order of the remaining tags. Adding a new tag appends it to the end.
+ * The result is always deduplicated.
+ */
+export function toggleProjectTagAssignment(currentTagIds: readonly TagId[], tagId: TagId): TagId[] {
+  const seen = new Set<TagId>();
+  const deduped: TagId[] = [];
+  for (const existing of currentTagIds) {
+    if (seen.has(existing)) continue;
+    seen.add(existing);
+    deduped.push(existing);
+  }
+  if (seen.has(tagId)) {
+    return deduped.filter((id) => id !== tagId);
+  }
+  return [...deduped, tagId];
 }

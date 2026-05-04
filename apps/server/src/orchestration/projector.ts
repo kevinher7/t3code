@@ -13,6 +13,9 @@ import {
   ProjectCreatedPayload,
   ProjectDeletedPayload,
   ProjectMetaUpdatedPayload,
+  TagCreatedPayload,
+  TagDeletedPayload,
+  TagRenamedPayload,
   ThreadActivityAppendedPayload,
   ThreadArchivedPayload,
   ThreadCreatedPayload,
@@ -160,6 +163,7 @@ export function createEmptyReadModel(nowIso: string): OrchestrationReadModel {
     snapshotSequence: 0,
     projects: [],
     threads: [],
+    tags: [],
     updatedAt: nowIso,
   };
 }
@@ -185,6 +189,7 @@ export function projectEvent(
             workspaceRoot: payload.workspaceRoot,
             defaultModelSelection: payload.defaultModelSelection,
             scripts: payload.scripts,
+            tags: payload.tags,
             createdAt: payload.createdAt,
             updatedAt: payload.updatedAt,
             deletedAt: null,
@@ -217,6 +222,7 @@ export function projectEvent(
                     ? { defaultModelSelection: payload.defaultModelSelection }
                     : {}),
                   ...(payload.scripts !== undefined ? { scripts: payload.scripts } : {}),
+                  ...(payload.tags !== undefined ? { tags: payload.tags } : {}),
                   updatedAt: payload.updatedAt,
                 }
               : project,
@@ -646,6 +652,59 @@ export function projectEvent(
             }),
           };
         }),
+      );
+
+    case "tag.created":
+      return decodeForEvent(TagCreatedPayload, event.payload, event.type, "payload").pipe(
+        Effect.map((payload) => {
+          const existing = nextBase.tags.find((tag) => tag.id === payload.tagId);
+          const nextTag = {
+            id: payload.tagId,
+            name: payload.name,
+            createdAt: payload.createdAt,
+            updatedAt: payload.updatedAt,
+          };
+          return {
+            ...nextBase,
+            tags: existing
+              ? nextBase.tags.map((tag) => (tag.id === payload.tagId ? nextTag : tag))
+              : [...nextBase.tags, nextTag],
+          };
+        }),
+      );
+
+    case "tag.renamed":
+      return decodeForEvent(TagRenamedPayload, event.payload, event.type, "payload").pipe(
+        Effect.map((payload) => {
+          const existing = nextBase.tags.find((tag) => tag.id === payload.tagId);
+          if (!existing) {
+            return nextBase;
+          }
+          return {
+            ...nextBase,
+            tags: nextBase.tags.map((tag) =>
+              tag.id === payload.tagId
+                ? {
+                    ...tag,
+                    name: payload.name,
+                    updatedAt: payload.updatedAt,
+                  }
+                : tag,
+            ),
+          };
+        }),
+      );
+
+    case "tag.deleted":
+      return decodeForEvent(TagDeletedPayload, event.payload, event.type, "payload").pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          tags: nextBase.tags.filter((tag) => tag.id !== payload.tagId),
+          projects: nextBase.projects.map((project) => ({
+            ...project,
+            tags: project.tags.filter((tagId) => tagId !== payload.tagId),
+          })),
+        })),
       );
 
     default:

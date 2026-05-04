@@ -1,5 +1,5 @@
 import { scopeProjectRef } from "@t3tools/client-runtime";
-import type { EnvironmentId, ScopedProjectRef } from "@t3tools/contracts";
+import type { EnvironmentId, ScopedProjectRef, TagId } from "@t3tools/contracts";
 import {
   deriveLogicalProjectKeyFromSettings,
   derivePhysicalProjectKey,
@@ -23,6 +23,7 @@ export interface SidebarProjectSnapshot extends Project {
   memberProjects: readonly SidebarProjectGroupMember[];
   memberProjectRefs: readonly ScopedProjectRef[];
   remoteEnvironmentLabels: readonly string[];
+  displayTagIds: readonly TagId[];
 }
 
 export function buildPhysicalToLogicalProjectKeyMap(input: {
@@ -95,6 +96,8 @@ export function buildSidebarProjectSnapshots(input: {
       .flatMap((member) => (member.environmentLabel ? [member.environmentLabel] : []))
       .filter((label, index, labels) => labels.indexOf(label) === index);
 
+    const displayTagIds = Array.from(new Set(members.flatMap((member) => member.tags))) as TagId[];
+
     result.push({
       ...representative,
       projectKey: logicalKey,
@@ -111,6 +114,7 @@ export function buildSidebarProjectSnapshots(input: {
       memberProjects: members,
       memberProjectRefs: members.map((member) => scopeProjectRef(member.environmentId, member.id)),
       remoteEnvironmentLabels,
+      displayTagIds,
     });
   }
 

@@ -25,7 +25,8 @@ const resetMigrationsState = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const tables = yield* sql<{
     readonly name: string;
-  }>`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`.withoutTransform;
+  }>`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
+    .withoutTransform;
   for (const { name } of tables) {
     yield* sql`DROP TABLE IF EXISTS ${sql(name)}`;
   }

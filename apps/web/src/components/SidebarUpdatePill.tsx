@@ -1,12 +1,12 @@
 import { DownloadIcon, RotateCwIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { isElectron } from "../../env";
+import { isElectron } from "../env";
 import {
   setDesktopUpdateStateQueryData,
   useDesktopUpdateState,
-} from "../../lib/desktopUpdateReactQuery";
-import { stackedThreadToast, toastManager } from "../ui/toast";
+} from "../lib/desktopUpdateReactQuery";
+import { stackedThreadToast, toastManager } from "./ui/toast";
 import {
   getArm64IntelBuildWarningDescription,
   getDesktopUpdateActionError,
@@ -17,9 +17,9 @@ import {
   shouldShowArm64IntelBuildWarning,
   shouldShowDesktopUpdateButton,
   shouldToastDesktopUpdateActionResult,
-} from "../desktopUpdate.logic";
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+} from "./desktopUpdate.logic";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
 export function SidebarUpdatePill() {
   const queryClient = useQueryClient();
