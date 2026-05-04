@@ -3,14 +3,7 @@ import { PlusIcon } from "lucide-react";
 import { type TagId } from "@t3tools/contracts";
 import type { Tag } from "../types";
 import type { SidebarProjectGroupMember } from "../sidebarProjectGrouping";
-import {
-  Menu,
-  MenuCheckboxItem,
-  MenuGroup,
-  MenuItem,
-  MenuPopup,
-  MenuSeparator,
-} from "./ui/menu";
+import { Menu, MenuCheckboxItem, MenuGroup, MenuItem, MenuPopup, MenuSeparator } from "./ui/menu";
 
 export interface ProjectTagsEditorProps {
   projectMember: SidebarProjectGroupMember;

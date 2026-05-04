@@ -3,11 +3,7 @@ import { ChevronRightIcon, PlusIcon, XIcon } from "lucide-react";
 import { type TagId } from "@t3tools/contracts";
 import type { Tag } from "../types";
 import { cn } from "../lib/utils";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "./ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { Menu, MenuItem, MenuPopup } from "./ui/menu";
 import { Toggle } from "./ui/toggle";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
@@ -54,12 +50,7 @@ function TagFilterPillContextMenu({
         }
       }}
     >
-      <MenuPopup
-        anchor={virtualAnchor}
-        align="start"
-        side="bottom"
-        className="min-w-32"
-      >
+      <MenuPopup anchor={virtualAnchor} align="start" side="bottom" className="min-w-32">
         <MenuItem
           onClick={() => {
             onRename();
@@ -90,13 +81,7 @@ interface TagFilterPillProps {
   onDelete: () => void;
 }
 
-function TagFilterPill({
-  tag,
-  pressed,
-  onPressedChange,
-  onRename,
-  onDelete,
-}: TagFilterPillProps) {
+function TagFilterPill({ tag, pressed, onPressedChange, onRename, onDelete }: TagFilterPillProps) {
   const [contextAnchor, setContextAnchor] = useState<{ x: number; y: number } | null>(null);
   return (
     <>
@@ -117,10 +102,7 @@ function TagFilterPill({
           "data-pressed:hover:bg-foreground/90",
         )}
       >
-        <span
-          data-testid={`sidebar-tag-filter-toggle-${tag.id}`}
-          className="max-w-40 truncate"
-        >
+        <span data-testid={`sidebar-tag-filter-toggle-${tag.id}`} className="max-w-40 truncate">
           {tag.name}
         </span>
       </Toggle>
