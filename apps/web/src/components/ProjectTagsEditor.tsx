@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { PlusIcon } from "lucide-react";
 import { type TagId } from "@t3tools/contracts";
-import type { Tag } from "../../types";
-import type { SidebarProjectGroupMember } from "../../sidebarProjectGrouping";
+import type { Tag } from "../types";
+import type { SidebarProjectGroupMember } from "../sidebarProjectGrouping";
 import {
   Menu,
   MenuCheckboxItem,
@@ -10,7 +10,7 @@ import {
   MenuItem,
   MenuPopup,
   MenuSeparator,
-} from "../ui/menu";
+} from "./ui/menu";
 
 export interface ProjectTagsEditorProps {
   projectMember: SidebarProjectGroupMember;

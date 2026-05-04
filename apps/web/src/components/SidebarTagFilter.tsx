@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react";
 import { ChevronRightIcon, PlusIcon, XIcon } from "lucide-react";
 import { type TagId } from "@t3tools/contracts";
-import type { Tag } from "../../types";
-import { cn } from "../../lib/utils";
+import type { Tag } from "../types";
+import { cn } from "../lib/utils";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "../ui/collapsible";
-import { Menu, MenuItem, MenuPopup } from "../ui/menu";
-import { Toggle } from "../ui/toggle";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+} from "./ui/collapsible";
+import { Menu, MenuItem, MenuPopup } from "./ui/menu";
+import { Toggle } from "./ui/toggle";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
 
 interface TagFilterPillContextMenuProps {

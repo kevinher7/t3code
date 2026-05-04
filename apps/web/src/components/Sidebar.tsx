@@ -167,10 +167,10 @@ import {
   ThreadStatusPill,
 } from "./Sidebar.logic";
 import { sortThreads } from "../lib/threadSort";
-import { ProjectTagsEditor } from "./sidebar/ProjectTagsEditor";
-import { SidebarSectionHeader } from "./sidebar/SidebarSectionHeader";
-import { SidebarTagFilter } from "./sidebar/SidebarTagFilter";
-import { SidebarUpdatePill } from "./sidebar/SidebarUpdatePill";
+import { ProjectTagsEditor } from "./ProjectTagsEditor";
+import { SidebarSectionHeader } from "./SidebarSectionHeader";
+import { SidebarTagFilter } from "./SidebarTagFilter";
+import { SidebarUpdatePill } from "./SidebarUpdatePill";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { CommandDialogTrigger } from "./ui/command";
 import { readEnvironmentApi } from "../environmentApi";
