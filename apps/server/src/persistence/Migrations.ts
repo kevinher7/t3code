@@ -42,6 +42,8 @@ import Migration0023 from "./Migrations/023_ProjectionThreadShellSummary.ts";
 import Migration0024 from "./Migrations/024_BackfillProjectionThreadShellSummary.ts";
 import Migration0025 from "./Migrations/025_CleanupInvalidProjectionPendingApprovals.ts";
 import Migration0026 from "./Migrations/026_CanonicalizeModelSelectionOptions.ts";
+import Migration0027 from "./Migrations/027_ProviderSessionRuntimeInstanceId.ts";
+import Migration0028 from "./Migrations/028_ProjectionThreadSessionInstanceId.ts";
 import Migration5001 from "./Migrations/5001_ProjectionTags.ts";
 
 /**
@@ -55,7 +57,7 @@ import Migration5001 from "./Migrations/5001_ProjectionTags.ts";
  * returns migrations sorted by ID.
  *
  * Banded migration id convention:
- * - Upstream band: ids `1..999`. The next upstream id is `27`. Downstream files
+ * - Upstream band: ids `1..999`. The next upstream id is `29`. Downstream files
  *   in this band are reserved for upstream merges only.
  * - Downstream-only band: ids `>= 5000`. The first downstream-only migration
  *   is `5001_ProjectionTags`. The 4000-id gap is intentional headroom against
@@ -93,6 +95,8 @@ export const migrationEntries = [
   [24, "BackfillProjectionThreadShellSummary", Migration0024],
   [25, "CleanupInvalidProjectionPendingApprovals", Migration0025],
   [26, "CanonicalizeModelSelectionOptions", Migration0026],
+  [27, "ProviderSessionRuntimeInstanceId", Migration0027],
+  [28, "ProjectionThreadSessionInstanceId", Migration0028],
   [5001, "ProjectionTags", Migration5001],
 ] as const;
 

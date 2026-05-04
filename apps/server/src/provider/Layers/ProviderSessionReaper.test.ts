@@ -1,5 +1,11 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { ProjectId, ThreadId, TurnId } from "@t3tools/contracts";
+import {
+  ProjectId,
+  ThreadId,
+  TurnId,
+  ProviderDriverKind,
+  ProviderInstanceId,
+} from "@t3tools/contracts";
 import { Effect, Exit, Layer, ManagedRuntime, Option, Scope, Stream } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -17,7 +23,7 @@ import { ProviderSessionDirectoryLive } from "./ProviderSessionDirectory.ts";
 import { makeProviderSessionReaperLive } from "./ProviderSessionReaper.ts";
 
 const defaultModelSelection = {
-  provider: "codex",
+  instanceId: ProviderInstanceId.make("codex"),
   model: "gpt-5-codex",
 } as const;
 
@@ -142,6 +148,19 @@ describe("ProviderSessionReaper", () => {
       stopSession,
       listSessions: () => Effect.succeed([]),
       getCapabilities: () => Effect.succeed({ sessionModelSwitch: "in-session" }),
+      getInstanceInfo: (instanceId) => {
+        const driverKind = ProviderDriverKind.make(String(instanceId));
+        return Effect.succeed({
+          instanceId,
+          driverKind,
+          displayName: undefined,
+          enabled: true,
+          continuationIdentity: {
+            driverKind,
+            continuationKey: `${driverKind}:instance:${instanceId}`,
+          },
+        });
+      },
       rollbackConversation: () => unsupported(),
       streamEvents: Stream.empty,
     };
@@ -199,6 +218,7 @@ describe("ProviderSessionReaper", () => {
       repository.upsert({
         threadId,
         providerName: "claudeAgent",
+        providerInstanceId: null,
         adapterKey: "claudeAgent",
         runtimeMode: "full-access",
         status: "running",
@@ -246,6 +266,7 @@ describe("ProviderSessionReaper", () => {
       repository.upsert({
         threadId,
         providerName: "claudeAgent",
+        providerInstanceId: null,
         adapterKey: "claudeAgent",
         runtimeMode: "full-access",
         status: "running",
@@ -292,6 +313,7 @@ describe("ProviderSessionReaper", () => {
       repository.upsert({
         threadId,
         providerName: "claudeAgent",
+        providerInstanceId: null,
         adapterKey: "claudeAgent",
         runtimeMode: "full-access",
         status: "running",
@@ -338,6 +360,7 @@ describe("ProviderSessionReaper", () => {
       repository.upsert({
         threadId,
         providerName: "claudeAgent",
+        providerInstanceId: null,
         adapterKey: "claudeAgent",
         runtimeMode: "full-access",
         status: "stopped",
@@ -406,6 +429,7 @@ describe("ProviderSessionReaper", () => {
       repository.upsert({
         threadId: failedThreadId,
         providerName: "claudeAgent",
+        providerInstanceId: null,
         adapterKey: "claudeAgent",
         runtimeMode: "full-access",
         status: "running",
@@ -420,6 +444,7 @@ describe("ProviderSessionReaper", () => {
       repository.upsert({
         threadId: reapedThreadId,
         providerName: "codex",
+        providerInstanceId: null,
         adapterKey: "codex",
         runtimeMode: "full-access",
         status: "running",
@@ -485,6 +510,7 @@ describe("ProviderSessionReaper", () => {
       repository.upsert({
         threadId: defectThreadId,
         providerName: "claudeAgent",
+        providerInstanceId: null,
         adapterKey: "claudeAgent",
         runtimeMode: "full-access",
         status: "running",
@@ -499,6 +525,7 @@ describe("ProviderSessionReaper", () => {
       repository.upsert({
         threadId: reapedThreadId,
         providerName: "codex",
+        providerInstanceId: null,
         adapterKey: "codex",
         runtimeMode: "full-access",
         status: "running",
