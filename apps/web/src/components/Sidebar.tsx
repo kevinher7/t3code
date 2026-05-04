@@ -3231,10 +3231,9 @@ export default function Sidebar() {
   );
   const sortedProjects = useMemo(() => {
     const filteredSidebarProjects = filterProjectSnapshotsByTags(sidebarProjects, selectedTagIds);
-    const sortableProjects = filteredSidebarProjects.map((project) => ({
-      ...project,
-      id: project.projectKey,
-    }));
+    const sortableProjects = filteredSidebarProjects.map((project) =>
+      Object.assign({}, project, { id: project.projectKey }),
+    );
     const sortableThreads = visibleThreads.map((thread) => {
       const physicalKey =
         projectPhysicalKeyByScopedRef.get(
