@@ -2464,7 +2464,7 @@ function TagFilterPill({
         data-testid={`sidebar-tag-filter-item-${tag.id}`}
         aria-pressed={pressed}
         className={cn(
-          "h-6 rounded-full px-2 text-[10px] sm:h-5",
+          "h-6 rounded-full px-2 text-xs text-foreground/90 sm:h-5 sm:text-xs",
           "data-pressed:border-foreground data-pressed:bg-foreground data-pressed:text-background",
           "data-pressed:hover:bg-foreground/90",
         )}
