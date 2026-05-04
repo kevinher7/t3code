@@ -1,7 +1,6 @@
 import {
   ArchiveIcon,
   ArrowUpDownIcon,
-  CheckIcon,
   ChevronRightIcon,
   CloudIcon,
   GitPullRequestIcon,
@@ -9,7 +8,6 @@ import {
   SearchIcon,
   SettingsIcon,
   SquarePenIcon,
-  TagIcon,
   TerminalIcon,
   TriangleAlertIcon,
   XIcon,
@@ -2466,15 +2464,11 @@ function TagFilterPill({
         data-testid={`sidebar-tag-filter-item-${tag.id}`}
         aria-pressed={pressed}
         className={cn(
-          "h-6 gap-1 rounded-full px-2 text-[10px] font-medium sm:h-5",
+          "h-6 rounded-full px-2 text-[10px] sm:h-5",
           "data-pressed:border-foreground data-pressed:bg-foreground data-pressed:text-background",
           "data-pressed:hover:bg-foreground/90",
         )}
       >
-        <CheckIcon
-          className={cn("size-2.5 shrink-0", pressed ? "opacity-100" : "opacity-0")}
-          aria-hidden
-        />
         <span
           data-testid={`sidebar-tag-filter-toggle-${tag.id}`}
           className="max-w-40 truncate"
@@ -2491,6 +2485,27 @@ function TagFilterPill({
         />
       ) : null}
     </>
+  );
+}
+
+interface SidebarSectionHeaderProps {
+  label: string;
+  children?: React.ReactNode;
+}
+
+/**
+ * Shared header used for top-level sidebar sections (Tags, Projects, …).
+ * Keeps label typography, padding, and right-aligned action slot consistent
+ * across sections so they have the exact same formatting and size.
+ */
+function SidebarSectionHeader({ label, children }: SidebarSectionHeaderProps) {
+  return (
+    <div className="mb-1 flex items-center justify-between pl-2 pr-1.5">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+        {label}
+      </span>
+      {children ? <div className="flex items-center gap-1">{children}</div> : null}
+    </div>
   );
 }
 
@@ -2518,68 +2533,63 @@ function TagFilterPills({
   const headerLabel = hasSelection && !open ? `Tags (${selectedTagIds.length})` : "Tags";
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between gap-1">
-          <CollapsibleTrigger
-            data-testid="sidebar-tag-filter-trigger"
-            className="group flex h-6 min-w-0 flex-1 items-center gap-1.5 rounded-md pl-2 pr-1.5 text-left text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <ChevronRightIcon className="size-3 shrink-0 opacity-70 transition-transform duration-150 group-data-panel-open:rotate-90" />
-            <TagIcon className="size-3 shrink-0 opacity-70" />
-            <span className="flex-1 truncate text-[10px] font-medium uppercase tracking-wider">
-              {headerLabel}
-            </span>
-          </CollapsibleTrigger>
-          {hasSelection ? (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    aria-label="Clear tag filter"
-                    data-testid="sidebar-tag-filter-clear"
-                    className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
-                    onClick={onClear}
-                  />
-                }
-              >
-                <XIcon className="size-3" />
-              </TooltipTrigger>
-              <TooltipPopup side="right">Clear filter</TooltipPopup>
-            </Tooltip>
-          ) : null}
+      <SidebarSectionHeader label={headerLabel}>
+        {hasSelection ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label="Clear tag filter"
+                  data-testid="sidebar-tag-filter-clear"
+                  className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
+                  onClick={onClear}
+                />
+              }
+            >
+              <XIcon className="size-3" />
+            </TooltipTrigger>
+            <TooltipPopup side="right">Clear filter</TooltipPopup>
+          </Tooltip>
+        ) : null}
+        <CollapsibleTrigger
+          data-testid="sidebar-tag-filter-trigger"
+          aria-label={open ? "Collapse tags" : "Expand tags"}
+          className="group inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <ChevronRightIcon className="size-3.5 transition-transform duration-150 group-data-panel-open:rotate-90" />
+        </CollapsibleTrigger>
+      </SidebarSectionHeader>
+      <CollapsibleContent>
+        <div className="flex flex-wrap gap-1 px-2 pb-0.5">
+          {tags.map((tag) => (
+            <TagFilterPill
+              key={tag.id}
+              tag={tag}
+              pressed={selectedTagIds.includes(tag.id)}
+              onPressedChange={() => onToggleTag(tag.id)}
+              onRename={() => onRenameTag(tag)}
+              onDelete={() => onDeleteTag(tag)}
+            />
+          ))}
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label="New tag"
+                  data-testid="sidebar-tag-filter-create"
+                  onClick={onCreate}
+                  className="inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border border-dashed border-input/60 text-muted-foreground/70 transition-colors hover:border-input hover:bg-accent hover:text-foreground sm:h-5 sm:min-w-5"
+                />
+              }
+            >
+              <PlusIcon className="size-3" />
+            </TooltipTrigger>
+            <TooltipPopup side="right">New tag</TooltipPopup>
+          </Tooltip>
         </div>
-        <CollapsibleContent>
-          <div className="flex flex-wrap gap-1 px-2 pb-0.5">
-            {tags.map((tag) => (
-              <TagFilterPill
-                key={tag.id}
-                tag={tag}
-                pressed={selectedTagIds.includes(tag.id)}
-                onPressedChange={() => onToggleTag(tag.id)}
-                onRename={() => onRenameTag(tag)}
-                onDelete={() => onDeleteTag(tag)}
-              />
-            ))}
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    aria-label="New tag"
-                    data-testid="sidebar-tag-filter-create"
-                    onClick={onCreate}
-                    className="inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border border-dashed border-input/60 text-muted-foreground/70 transition-colors hover:border-input hover:bg-accent hover:text-foreground sm:h-5 sm:min-w-5"
-                  />
-                }
-              >
-                <PlusIcon className="size-3" />
-              </TooltipTrigger>
-              <TooltipPopup side="right">New tag</TooltipPopup>
-            </Tooltip>
-          </div>
-        </CollapsibleContent>
-      </div>
+      </CollapsibleContent>
     </Collapsible>
   );
 }
@@ -2952,7 +2962,7 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
           </Alert>
         </SidebarGroup>
       ) : null}
-      <SidebarGroup className="px-2 pt-2 pb-1">
+      <SidebarGroup className="px-2 py-2">
         <TagFilterPills
           tags={tagsForSidebar}
           selectedTagIds={selectedTagIds}
@@ -2964,37 +2974,32 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
         />
       </SidebarGroup>
       <SidebarGroup className="px-2 py-2">
-        <div className="mb-1 flex items-center justify-between pl-2 pr-1.5">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-            Projects
-          </span>
-          <div className="flex items-center gap-1">
-            <ProjectSortMenu
-              projectSortOrder={projectSortOrder}
-              threadSortOrder={threadSortOrder}
-              projectGroupingMode={projectGroupingMode}
-              onProjectSortOrderChange={handleProjectSortOrderChange}
-              onThreadSortOrderChange={handleThreadSortOrderChange}
-              onProjectGroupingModeChange={handleProjectGroupingModeChange}
-            />
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    aria-label="Add project"
-                    data-testid="sidebar-add-project-trigger"
-                    className="inline-flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
-                    onClick={openAddProject}
-                  />
-                }
-              >
-                <PlusIcon className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipPopup side="right">Add project</TooltipPopup>
-            </Tooltip>
-          </div>
-        </div>
+        <SidebarSectionHeader label="Projects">
+          <ProjectSortMenu
+            projectSortOrder={projectSortOrder}
+            threadSortOrder={threadSortOrder}
+            projectGroupingMode={projectGroupingMode}
+            onProjectSortOrderChange={handleProjectSortOrderChange}
+            onThreadSortOrderChange={handleThreadSortOrderChange}
+            onProjectGroupingModeChange={handleProjectGroupingModeChange}
+          />
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label="Add project"
+                  data-testid="sidebar-add-project-trigger"
+                  className="inline-flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
+                  onClick={openAddProject}
+                />
+              }
+            >
+              <PlusIcon className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipPopup side="right">Add project</TooltipPopup>
+          </Tooltip>
+        </SidebarSectionHeader>
 
         {isManualProjectSorting ? (
           <DndContext

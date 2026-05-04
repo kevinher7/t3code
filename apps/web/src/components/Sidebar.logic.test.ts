@@ -996,18 +996,18 @@ describe("filterProjectSnapshotsByTags", () => {
   const tagB = TagId.make("tag-b");
   const tagC = TagId.make("tag-c");
 
-  function makeSnapshot(
-    overrides: Partial<SidebarProjectSnapshot> & {
-      projectKey: string;
-      displayTagIds: readonly TagId[];
-    },
-  ): SidebarProjectSnapshot {
+  function makeSnapshot({
+    projectKey,
+    displayTagIds,
+  }: {
+    projectKey: string;
+    displayTagIds: readonly TagId[];
+  }): SidebarProjectSnapshot {
     // Cast through unknown — the helper only inspects `displayTagIds` so we
     // intentionally narrow the surface used by the test.
     return {
-      projectKey: overrides.projectKey,
-      displayTagIds: overrides.displayTagIds,
-      ...overrides,
+      projectKey,
+      displayTagIds,
     } as unknown as SidebarProjectSnapshot;
   }
 
