@@ -3,6 +3,7 @@ import {
   type EditorId,
   type ProjectScript,
   type ResolvedKeybindingsConfig,
+  type TagId,
   type ThreadId,
 } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime";
@@ -13,8 +14,10 @@ import { DiffIcon, TerminalSquareIcon } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import ProjectScriptsControl, { type NewProjectScriptInput } from "../ProjectScriptsControl";
+import ProjectTagsControl from "../ProjectTagsControl";
 import { Toggle } from "../ui/toggle";
 import { SidebarTrigger } from "../ui/sidebar";
+import type { Tag } from "../../types";
 import { OpenInPicker } from "./OpenInPicker";
 import { usePrimaryEnvironmentId } from "../../environments/primary";
 
@@ -28,6 +31,8 @@ interface ChatHeaderProps {
   openInCwd: string | null;
   activeProjectScripts: ProjectScript[] | undefined;
   preferredScriptId: string | null;
+  activeProjectTags: readonly TagId[] | undefined;
+  availableTags: readonly Tag[];
   keybindings: ResolvedKeybindingsConfig;
   availableEditors: ReadonlyArray<EditorId>;
   terminalAvailable: boolean;
@@ -40,6 +45,8 @@ interface ChatHeaderProps {
   onAddProjectScript: (input: NewProjectScriptInput) => Promise<void>;
   onUpdateProjectScript: (scriptId: string, input: NewProjectScriptInput) => Promise<void>;
   onDeleteProjectScript: (scriptId: string) => Promise<void>;
+  onToggleProjectTag: (tagId: TagId, nextChecked: boolean) => void | Promise<void>;
+  onCreateProjectTag: () => void;
   onToggleTerminal: () => void;
   onToggleDiff: () => void;
 }
@@ -66,6 +73,8 @@ export const ChatHeader = memo(function ChatHeader({
   openInCwd,
   activeProjectScripts,
   preferredScriptId,
+  activeProjectTags,
+  availableTags,
   keybindings,
   availableEditors,
   terminalAvailable,
@@ -78,6 +87,8 @@ export const ChatHeader = memo(function ChatHeader({
   onAddProjectScript,
   onUpdateProjectScript,
   onDeleteProjectScript,
+  onToggleProjectTag,
+  onCreateProjectTag,
   onToggleTerminal,
   onToggleDiff,
 }: ChatHeaderProps) {
@@ -110,6 +121,14 @@ export const ChatHeader = memo(function ChatHeader({
         )}
       </div>
       <div className="flex shrink-0 items-center justify-end gap-2 @3xl/header-actions:gap-3">
+        {activeProjectTags !== undefined && (
+          <ProjectTagsControl
+            assignedTagIds={activeProjectTags}
+            availableTags={availableTags}
+            onToggleTag={onToggleProjectTag}
+            onCreateTag={onCreateProjectTag}
+          />
+        )}
         {activeProjectScripts && (
           <ProjectScriptsControl
             scripts={activeProjectScripts}
