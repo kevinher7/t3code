@@ -2803,7 +2803,7 @@ export default function Sidebar() {
   const [tagRenameTarget, setTagRenameTarget] = useState<Tag | null>(null);
   const [tagRenameName, setTagRenameName] = useState("");
   const [editTagsAnchor, setEditTagsAnchor] = useState<{
-    member: SidebarProjectGroupMember;
+    physicalProjectKey: string;
     x: number;
     y: number;
   } | null>(null);
@@ -2822,7 +2822,11 @@ export default function Sidebar() {
   }, []);
   const handleOpenEditTagsForMember = useCallback(
     (member: SidebarProjectGroupMember, position: { x: number; y: number }) => {
-      setEditTagsAnchor({ member, x: position.x, y: position.y });
+      setEditTagsAnchor({
+        physicalProjectKey: member.physicalProjectKey,
+        x: position.x,
+        y: position.y,
+      });
     },
     [],
   );
@@ -2985,43 +2989,6 @@ export default function Sidebar() {
     },
     [clearProjectTagFilterTagId, projects],
   );
-  const handleToggleProjectTagAssignment = useCallback(
-    async (tagId: TagId, _nextChecked: boolean) => {
-      const anchor = editTagsAnchor;
-      if (!anchor) {
-        return;
-      }
-      const nextTagIds = toggleProjectTagAssignment(anchor.member.tags, tagId);
-      const api = readEnvironmentApi(anchor.member.environmentId);
-      if (!api) {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: `Failed to update tags for "${anchor.member.name}"`,
-            description: "Project API unavailable.",
-          }),
-        );
-        return;
-      }
-      try {
-        await api.orchestration.dispatchCommand({
-          type: "project.meta.update",
-          commandId: newCommandId(),
-          projectId: anchor.member.id,
-          tags: nextTagIds,
-        });
-      } catch (error) {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: `Failed to update tags for "${anchor.member.name}"`,
-            description: error instanceof Error ? error.message : "An error occurred.",
-          }),
-        );
-      }
-    },
-    [editTagsAnchor],
-  );
   const navigate = useNavigate();
   const pathname = useLocation({ select: (loc) => loc.pathname });
   const isOnSettings = pathname.startsWith("/settings");
@@ -3110,6 +3077,57 @@ export default function Sidebar() {
   const sidebarProjectByKey = useMemo(
     () => new Map(sidebarProjects.map((project) => [project.projectKey, project] as const)),
     [sidebarProjects],
+  );
+  const editTagsMember = useMemo<SidebarProjectGroupMember | null>(() => {
+    if (!editTagsAnchor) return null;
+    for (const snapshot of sidebarProjects) {
+      const found = snapshot.memberProjects.find(
+        (m) => m.physicalProjectKey === editTagsAnchor.physicalProjectKey,
+      );
+      if (found) return found;
+    }
+    return null;
+  }, [editTagsAnchor, sidebarProjects]);
+  useEffect(() => {
+    if (editTagsAnchor !== null && editTagsMember === null) {
+      setEditTagsAnchor(null);
+    }
+  }, [editTagsAnchor, editTagsMember]);
+  const handleToggleProjectTagAssignment = useCallback(
+    async (tagId: TagId, _nextChecked: boolean) => {
+      if (!editTagsMember) {
+        return;
+      }
+      const nextTagIds = toggleProjectTagAssignment(editTagsMember.tags, tagId);
+      const api = readEnvironmentApi(editTagsMember.environmentId);
+      if (!api) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: `Failed to update tags for "${editTagsMember.name}"`,
+            description: "Project API unavailable.",
+          }),
+        );
+        return;
+      }
+      try {
+        await api.orchestration.dispatchCommand({
+          type: "project.meta.update",
+          commandId: newCommandId(),
+          projectId: editTagsMember.id,
+          tags: nextTagIds,
+        });
+      } catch (error) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: `Failed to update tags for "${editTagsMember.name}"`,
+            description: error instanceof Error ? error.message : "An error occurred.",
+          }),
+        );
+      }
+    },
+    [editTagsMember],
   );
   const sidebarThreadByKey = useMemo(
     () =>
@@ -3784,9 +3802,9 @@ export default function Sidebar() {
           </DialogFooter>
         </DialogPopup>
       </Dialog>
-      {editTagsAnchor !== null ? (
+      {editTagsAnchor !== null && editTagsMember !== null ? (
         <ProjectTagsEditor
-          projectMember={editTagsAnchor.member}
+          projectMember={editTagsMember}
           tags={tagsForSidebar}
           anchor={{ x: editTagsAnchor.x, y: editTagsAnchor.y }}
           onClose={handleCloseEditTags}
