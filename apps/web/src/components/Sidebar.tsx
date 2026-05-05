@@ -177,6 +177,7 @@ import { CommandDialogTrigger } from "./ui/command";
 import { readEnvironmentApi } from "../environmentApi";
 import { useSettings, useUpdateSettings } from "~/hooks/useSettings";
 import { useServerKeybindings } from "../rpc/serverState";
+import { useTagCreateDialogStore } from "../tagCreateDialogStore";
 import {
   derivePhysicalProjectKey,
   deriveProjectGroupingOverrideKey,
@@ -2795,7 +2796,9 @@ export default function Sidebar() {
     (store) => store.setProjectTagFilterSelection,
   );
   const clearProjectTagFilterTagId = useUiStateStore((store) => store.clearProjectTagFilterTagId);
-  const [tagCreateDialogOpen, setTagCreateDialogOpen] = useState(false);
+  const tagCreateDialogOpen = useTagCreateDialogStore((s) => s.isOpen);
+  const openTagCreateDialogStore = useTagCreateDialogStore((s) => s.open);
+  const closeTagCreateDialogStore = useTagCreateDialogStore((s) => s.close);
   const [tagCreateName, setTagCreateName] = useState("");
   const [tagRenameTarget, setTagRenameTarget] = useState<Tag | null>(null);
   const [tagRenameName, setTagRenameName] = useState("");
@@ -2828,12 +2831,20 @@ export default function Sidebar() {
   }, []);
   const openTagCreateDialog = useCallback(() => {
     setTagCreateName("");
-    setTagCreateDialogOpen(true);
-  }, []);
+    openTagCreateDialogStore();
+  }, [openTagCreateDialogStore]);
   const closeTagCreateDialog = useCallback(() => {
-    setTagCreateDialogOpen(false);
+    closeTagCreateDialogStore();
     setTagCreateName("");
-  }, []);
+  }, [closeTagCreateDialogStore]);
+  // Reset name on every open transition so external triggers (e.g. the chat-header
+  // Tags popover) start with an empty input even when they open the dialog directly
+  // via the store.
+  useEffect(() => {
+    if (tagCreateDialogOpen) {
+      setTagCreateName("");
+    }
+  }, [tagCreateDialogOpen]);
   const closeTagRenameDialog = useCallback(() => {
     setTagRenameTarget(null);
     setTagRenameName("");

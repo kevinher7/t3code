@@ -12,6 +12,7 @@ import {
   type ServerProvider,
   type ResolvedKeybindingsConfig,
   type ScopedThreadRef,
+  type TagId,
   type ThreadId,
   type TurnId,
   type KeybindingCommand,
@@ -74,6 +75,7 @@ import {
 } from "../pendingUserInput";
 import {
   selectProjectsAcrossEnvironments,
+  selectTagsAcrossEnvironments,
   selectThreadsAcrossEnvironments,
   useStore,
 } from "../store";
@@ -91,12 +93,15 @@ import {
   MAX_TERMINALS_PER_GROUP,
   type ChatMessage,
   type SessionPhase,
+  type Tag,
   type Thread,
   type TurnDiffSummary,
 } from "../types";
 import { useTheme } from "../hooks/useTheme";
 import { useTurnDiffSummaries } from "../hooks/useTurnDiffSummaries";
 import { useCommandPaletteStore } from "../commandPaletteStore";
+import { useTagCreateDialogStore } from "../tagCreateDialogStore";
+import { toggleProjectTagAssignment } from "./Sidebar.logic";
 import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY } from "../rightPanelLayout";
@@ -2090,6 +2095,53 @@ export default function ChatView(props: ChatViewProps) {
     [activeProject, persistProjectScripts],
   );
 
+  const allTags = useStore(useShallow(selectTagsAcrossEnvironments));
+  const availableTags = useMemo<readonly Tag[]>(
+    () =>
+      activeProject
+        ? allTags.filter((tag) => tag.environmentId === activeProject.environmentId)
+        : [],
+    [allTags, activeProject],
+  );
+  const handleToggleProjectTag = useCallback(
+    async (tagId: TagId, _nextChecked: boolean) => {
+      if (!activeProject) return;
+      const api = readEnvironmentApi(activeProject.environmentId);
+      if (!api) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: `Failed to update tags for "${activeProject.name}"`,
+            description: "Project API unavailable.",
+          }),
+        );
+        return;
+      }
+      const nextTagIds = toggleProjectTagAssignment(activeProject.tags, tagId);
+      try {
+        await api.orchestration.dispatchCommand({
+          type: "project.meta.update",
+          commandId: newCommandId(),
+          projectId: activeProject.id,
+          tags: nextTagIds,
+        });
+      } catch (error) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: `Failed to update tags for "${activeProject.name}"`,
+            description: error instanceof Error ? error.message : "An error occurred.",
+          }),
+        );
+      }
+    },
+    [activeProject],
+  );
+  const openTagCreateDialog = useTagCreateDialogStore((s) => s.open);
+  const handleCreateProjectTag = useCallback(() => {
+    openTagCreateDialog();
+  }, [openTagCreateDialog]);
+
   const handleRuntimeModeChange = useCallback(
     (mode: RuntimeMode) => {
       if (mode === runtimeMode) return;
@@ -3522,6 +3574,8 @@ export default function ChatView(props: ChatViewProps) {
           preferredScriptId={
             activeProject ? (lastInvokedScriptByProjectId[activeProject.id] ?? null) : null
           }
+          activeProjectTags={activeProject?.tags}
+          availableTags={availableTags}
           keybindings={keybindings}
           availableEditors={availableEditors}
           terminalAvailable={activeProject !== undefined}
@@ -3534,6 +3588,8 @@ export default function ChatView(props: ChatViewProps) {
           onAddProjectScript={saveProjectScript}
           onUpdateProjectScript={updateProjectScript}
           onDeleteProjectScript={deleteProjectScript}
+          onToggleProjectTag={handleToggleProjectTag}
+          onCreateProjectTag={handleCreateProjectTag}
           onToggleTerminal={toggleTerminalVisibility}
           onToggleDiff={onToggleDiff}
         />
