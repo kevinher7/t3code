@@ -44,6 +44,8 @@ import Migration0025 from "./Migrations/025_CleanupInvalidProjectionPendingAppro
 import Migration0026 from "./Migrations/026_CanonicalizeModelSelectionOptions.ts";
 import Migration0027 from "./Migrations/027_ProviderSessionRuntimeInstanceId.ts";
 import Migration0028 from "./Migrations/028_ProjectionThreadSessionInstanceId.ts";
+import Migration0029 from "./Migrations/029_ProjectionThreadDetailOrderingIndexes.ts";
+import Migration0030 from "./Migrations/030_ProjectionThreadShellArchiveIndexes.ts";
 import Migration5001 from "./Migrations/5001_ProjectionTags.ts";
 
 /**
@@ -97,6 +99,8 @@ export const migrationEntries = [
   [26, "CanonicalizeModelSelectionOptions", Migration0026],
   [27, "ProviderSessionRuntimeInstanceId", Migration0027],
   [28, "ProjectionThreadSessionInstanceId", Migration0028],
+  [29, "ProjectionThreadDetailOrderingIndexes", Migration0029],
+  [30, "ProjectionThreadShellArchiveIndexes", Migration0030],
   [5001, "ProjectionTags", Migration5001],
 ] as const;
 
