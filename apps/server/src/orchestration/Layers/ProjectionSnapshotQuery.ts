@@ -1246,11 +1246,20 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
               ),
             ),
           ),
+          projectionTagRepository.listAll(),
         ]),
       )
       .pipe(
         Effect.flatMap(
-          ([projectRows, threadRows, proposedPlanRows, sessionRows, latestTurnRows, stateRows]) =>
+          ([
+            projectRows,
+            threadRows,
+            proposedPlanRows,
+            sessionRows,
+            latestTurnRows,
+            stateRows,
+            tagRows,
+          ]) =>
             Effect.sync(() => {
               let updatedAt: string | null = null;
               const projects: OrchestrationProject[] = [];
@@ -1375,6 +1384,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
                 snapshotSequence: computeSnapshotSequence(stateRows),
                 projects,
                 threads,
+                tags: tagRows.map(mapTagRow),
                 updatedAt: updatedAt ?? "1970-01-01T00:00:00.000Z",
               } satisfies OrchestrationReadModel;
             }),
