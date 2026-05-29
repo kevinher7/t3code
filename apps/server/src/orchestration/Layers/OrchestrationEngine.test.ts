@@ -191,6 +191,7 @@ describe("OrchestrationEngine", () => {
               snapshotSequence: projectionSnapshot.snapshotSequence,
               projects: [],
               threads: [],
+              tags: [],
               updatedAt: projectionSnapshot.updatedAt,
             }),
           getSnapshotSequence: () =>
