@@ -76,6 +76,10 @@
               export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
               export NODE_EXTRA_CA_CERTS=$SSL_CERT_FILE
               export ELECTRON_SKIP_BINARY_DOWNLOAD=1
+              # node-gyp (node-pty) must use the nixpkgs node headers instead of
+              # downloading them, and be told which python to use.
+              export npm_config_nodedir=${nodejs}
+              export npm_config_python=${pkgs.python3}/bin/python3
               bun install --frozen-lockfile --no-progress
               runHook postBuild
             '';
