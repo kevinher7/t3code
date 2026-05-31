@@ -79,8 +79,9 @@ kevinher7/t3code` is empty). The local `release/` dir has locally-built mac
 
 ## 4. Current state — `flake.nix` (this repo root)
 
-Authored and **evaluates cleanly** on all outputs (`nix eval` of `.name`
-succeeds). **Not built yet** — three hashes are `lib.fakeHash` placeholders.
+The CLI **builds and runs on `aarch64-darwin`**; the `aarch64-darwin` FOD hash
+is filled in. Two hashes remain `lib.fakeHash`: `bunDepsHashes.x86_64-linux`
+(build on the server) and `desktopHashes.aarch64-darwin` (needs a release).
 
 Outputs:
 
@@ -102,6 +103,23 @@ Build design:
   `$out/bin/t3 → node …/dist/bin.mjs` (adds `nodejs` to PATH for child procs).
 - **Desktop (darwin)** — `fetchurl` the `.zip`, `unzip`, copy `*.app` to
   `$out/Applications`.
+
+### Maintaining the flake (per release)
+
+`flake.nix` keeps comments minimal; this is the canonical maintenance list.
+When you cut a new release on `kevinher7/t3code`, update:
+
+1. **`version`** — e.g. `"0.0.25"` (drives both the desktop URL and the tag).
+2. **`desktopHashes.aarch64-darwin`** — hash of the fetched desktop artifact:
+   ```bash
+   nix store prefetch-file --json \
+     https://github.com/kevinher7/t3code/releases/download/v0.0.25/T3-Code-0.0.25-arm64.zip
+   ```
+3. **`bunDepsHashes.<system>`** — hash of the FOD `node_modules`, one per system.
+   Set the slot to `lib.fakeHash`, run `nix build .#t3-cli` **on that system /
+   builder**, and paste the `got:` hash Nix prints. The linux hash must be built
+   on a linux machine — it can't be produced from the Mac.
+4. **`flake.lock`** — `nix flake update` to refresh nixpkgs.
 
 ### Bug fixes applied to get the CLI building (2026-05-31)
 
