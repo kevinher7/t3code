@@ -61,7 +61,7 @@
 
       bunDepsHashes = {
         x86_64-linux = lib.fakeHash;
-        aarch64-darwin = lib.fakeHash;
+        aarch64-darwin = "sha256-OWHMBirGRbmEO6ASo06jm0Fn1m4yTkKItHaEnUhoSSw=";
       };
 
       # CLI builds on these; desktop is fetched only where an artifact exists.
@@ -71,7 +71,12 @@
       ];
 
       forAllSystems = lib.genAttrs systems;
-      pkgsFor = system: import nixpkgs { inherit system; config.allowUnfree = true; };
+      pkgsFor =
+        system:
+        import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
 
       # =======================================================================
       # CLI (built from source)
@@ -96,6 +101,7 @@
               nodejs
               pkgs.python3 # node-gyp for node-pty
               pkgs.pkg-config
+              pkgs.cacert # TLS roots for postinstall downloads inside the FOD
             ];
 
             dontConfigure = true;
@@ -105,6 +111,16 @@
               runHook preBuild
               export HOME=$TMPDIR
               export BUN_INSTALL_CACHE_DIR=$TMPDIR/bun-cache
+
+              # The FOD sandbox has no CA bundle by default; postinstall scripts
+              # (e.g. electron via node's `got`) fail cert verification without it.
+              export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+              export NODE_EXTRA_CA_CERTS=$SSL_CERT_FILE
+
+              # The `t3` CLI never uses Electron — skip its (large, network-only)
+              # binary download. Avoids unnecessary network + keeps the FOD lean.
+              export ELECTRON_SKIP_BINARY_DOWNLOAD=1
+
               bun install --frozen-lockfile --no-progress
               runHook postBuild
             '';
@@ -112,7 +128,16 @@
             installPhase = ''
               runHook preInstall
               mkdir -p $out
-              cp -R node_modules $out/node_modules
+              # bun's isolated linker creates a node_modules dir per workspace
+              # package (root, apps/*, packages/*, scripts) with relative
+              # symlinks into the root .bun virtual store. Capture every one at
+              # its relative path — saving only the root node_modules drops e.g.
+              # apps/web/node_modules/.bin/vite and the offline build can't run.
+              find . -type d -name node_modules -prune -print0 \
+                | while IFS= read -r -d "" d; do
+                    mkdir -p "$out/$(dirname "$d")"
+                    cp -R "$d" "$out/$(dirname "$d")/"
+                  done
               runHook postInstall
             '';
 
@@ -129,6 +154,7 @@
 
           nativeBuildInputs = [
             nodejs
+            pkgs.bun # turbo shells out to the declared package manager (bun)
             pkgs.makeWrapper
           ];
 
@@ -140,9 +166,15 @@
             export TURBO_TELEMETRY_DISABLED=1
             export DO_NOT_TRACK=1
 
-            # Bring in the pre-resolved dependency tree (writable copy).
-            cp -R ${nodeModules}/node_modules ./node_modules
-            chmod -R u+w ./node_modules
+            # Restore every pre-resolved workspace node_modules tree (root +
+            # apps/*, packages/*, scripts) into its matching path. bun's
+            # isolated layout uses relative symlinks between them, so the
+            # directory layout must be reproduced exactly (writable copies).
+            for d in $(cd ${nodeModules} && find . -type d -name node_modules -prune); do
+              mkdir -p "$(dirname "$d")"
+              cp -R "${nodeModules}/$d" "$d"
+              chmod -R u+w "$d"
+            done
 
             # `t3` depends on @t3tools/web, so this also runs the web build first,
             # then apps/server's `node scripts/cli.ts build` (tsdown + copy client).
@@ -152,15 +184,27 @@
 
           installPhase = ''
             runHook preInstall
-            mkdir -p $out/libexec/t3code
+            mkdir -p $out/libexec/t3code/apps/server
 
-            # tsdown leaves all npm deps external, so the runtime needs the full
-            # dependency tree next to dist/ (node-pty's native addon included).
-            cp -R apps/server/dist $out/libexec/t3code/dist
+            # tsdown leaves all npm deps external, so bin.mjs resolves them at
+            # runtime by walking up from its own location. bun's isolated layout
+            # puts apps/server's deps in apps/server/node_modules as relative
+            # symlinks (../../../node_modules/.bun/...) into the root virtual
+            # store — so the real relative layout must be reproduced:
+            #   apps/server/dist/bin.mjs  ->  apps/server/node_modules  ->  node_modules/.bun
+            # (node-pty's native addon and node:sqlite fallback included).
             cp -R node_modules $out/libexec/t3code/node_modules
+            cp -R apps/server/dist $out/libexec/t3code/apps/server/dist
+            cp -R apps/server/node_modules $out/libexec/t3code/apps/server/node_modules
+
+            # tsdown inlines every @t3tools/* (and effect-*) workspace package
+            # into bin.mjs, so their node_modules symlinks point at source dirs
+            # we deliberately don't ship — drop the now-dangling links (unused at
+            # runtime; they'd otherwise fail the noBrokenSymlinks fixup check).
+            find $out/libexec/t3code -xtype l -delete
 
             makeWrapper ${nodejs}/bin/node $out/bin/t3 \
-              --add-flags "$out/libexec/t3code/dist/bin.mjs" \
+              --add-flags "$out/libexec/t3code/apps/server/dist/bin.mjs" \
               --prefix PATH : ${lib.makeBinPath [ nodejs ]}
             runHook postInstall
           '';

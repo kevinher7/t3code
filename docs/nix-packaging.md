@@ -1,7 +1,10 @@
 # Nix packaging for the `kevinher7/t3code` fork
 
-> **Status:** flake authored and evaluating; **not yet built** (hashes are
-> placeholders). Resumable by a fresh agent — read this top to bottom.
+> **Status:** CLI **builds and runs on `aarch64-darwin`** (`t3 serve` boots:
+> migrations run, port binds, `node-pty` + `node:sqlite` both work). The
+> `aarch64-darwin` FOD hash is filled in. Still TODO: the `x86_64-linux` FOD
+> hash (build on the server) and the desktop hash (needs a published release).
+> Resumable by a fresh agent — read this top to bottom.
 >
 > **Audience:** the maintainer of the `personal` branch on `kevinher7/t3code`,
 > who runs a NixOS homelab + a nix-darwin MacBook and wants T3 Code installed
@@ -100,24 +103,76 @@ Build design:
 - **Desktop (darwin)** — `fetchurl` the `.zip`, `unzip`, copy `*.app` to
   `$out/Applications`.
 
+### Bug fixes applied to get the CLI building (2026-05-31)
+
+The flake "evaluated" but had never been built. Building it surfaced four real
+problems, all now fixed in `flake.nix` (these are bun-specific and unavoidable —
+see "Why not the reference repo's approach" below):
+
+1. **FOD had no CA bundle.** `electron`'s postinstall download failed with
+   `unable to get local issuer certificate`. Fixed by adding `pkgs.cacert` +
+   `SSL_CERT_FILE`/`NODE_EXTRA_CA_CERTS`, **and** setting
+   `ELECTRON_SKIP_BINARY_DOWNLOAD=1` (the CLI never uses Electron, so the
+   download was both failing and pointless).
+2. **turbo couldn't find its package manager.** The offline build derivation
+   was missing `bun` (turbo shells out to the declared `packageManager`). Added
+   `pkgs.bun` to the CLI derivation's `nativeBuildInputs`.
+3. **Per-workspace `node_modules` were dropped.** bun's **isolated linker**
+   creates a `node_modules` dir inside _every_ workspace package (`apps/*`,
+   `packages/*`, `scripts`) with relative symlinks into the root `.bun` virtual
+   store. The FOD originally saved only the root `node_modules`, so
+   `apps/web/node_modules/.bin/vite` vanished and the web build failed. Fixed:
+   the FOD now captures every `node_modules` dir at its relative path, and the
+   offline build restores them all.
+4. **Runtime module resolution was flattened wrong.** tsdown leaves npm deps
+   external; `bin.mjs` resolves them by walking up from its own dir. The install
+   originally put `dist/` next to the _root_ `node_modules`, but `effect` /
+   `node-pty` live in `apps/server/node_modules` (relative symlinks into root
+   `.bun`). Fixed by reproducing the real layout —
+   `apps/server/dist/bin.mjs` → `apps/server/node_modules` → root
+   `node_modules/.bun` — and dropping the dangling `@t3tools/*` workspace
+   symlinks (tsdown inlines those packages, so they're unused at runtime).
+
 ### Things that must still be filled in / verified
 
 The flake's top-of-file `MAINTENANCE NOTES` block lists these too.
 
-1. **`bunDepsHashes.x86_64-linux` / `.aarch64-darwin`** — set to `fakeHash`. Run
-   `nix build .#t3-cli` on each target system and paste the printed `got:` hash.
-   **Build the linux one on the server (or a linux builder)** — it can't be
-   built from the Mac.
+1. **`bunDepsHashes.aarch64-darwin`** — ✅ captured
+   (`sha256-OWHMBirGRbmEO6ASo06jm0Fn1m4yTkKItHaEnUhoSSw=`).
+   **`bunDepsHashes.x86_64-linux`** — still `fakeHash`. Run `nix build .#t3-cli`
+   **on the server (or a linux builder)** — it can't be built from the Mac — and
+   paste the printed `got:` hash.
 2. **`desktopHashes.aarch64-darwin`** — needs a published release first (§5),
    then `nix store prefetch-file <zip-url>`.
 3. **Risk: FOD reproducibility.** `bun install` may not be byte-reproducible. If
    the hash won't stabilize across builds, switch the `nodeModules` step to
    **`bun2nix`** (per-package hashing) — adds a flake input + a generated file
-   but removes FOD nondeterminism.
-4. **Risk: `node-pty` native build** inside the FOD may need more toolchain
-   (it builds via node-gyp). Add to the FOD's `nativeBuildInputs` as needed.
-5. **Risk: `node:sqlite` under `nodejs_24`** — if `t3 serve` errors on sqlite at
-   runtime, add `--add-flags "--experimental-sqlite"` to the wrapper.
+   but removes FOD nondeterminism. (This is the bun-native equivalent of the
+   reference repo's `importNpmLock`; see below.)
+4. **~~Risk: `node-pty` native build~~** — ✅ resolved. node-pty builds in the
+   FOD with the existing toolchain (`python3` + `pkg-config`) and loads at
+   runtime; `t3 serve` confirmed working.
+5. **~~Risk: `node:sqlite` under `nodejs_24`~~** — ✅ resolved. Migrations run on
+   boot with **no extra flag** — the `--experimental-sqlite` wrapper flag is
+   **not** needed on `nodejs_24`.
+
+### Why not the reference repo's approach (`Sawrz/t3code-nix`)
+
+A community flake (`github:Sawrz/t3code-nix`) packages **upstream**
+`pingdotgg/t3code`. Worth knowing what does and doesn't transfer:
+
+- **Desktop:** same pattern we use — `fetchurl` a prebuilt `.zip`/`.AppImage`
+  and extract the `.app`. Confirms our desktop approach; only the source repo
+  differs (we fetch from the fork, per §3).
+- **CLI:** it uses nixpkgs' **`importNpmLock`** (reads `package-lock.json`,
+  fetches each tarball reproducibly with no FOD/manual hash) and
+  `dontNpmBuild = true` (repackages a prebuilt npm artifact, no source build).
+  **This does not transfer to our fork:** the fork is bun-based (`bun.lock`,
+  catalog deps, `patchedDependencies`, turbo workspace) — there is no
+  `package-lock.json` for `importNpmLock` to read — and decision §3 requires
+  building the CLI _from source_ (turbo → tsdown), which `dontNpmBuild` skips.
+  The reproducible-without-FOD goal is real, but the bun-native tool for it is
+  **bun2nix** (item 3 above), not `importNpmLock`.
 
 ### Quick verification commands
 
@@ -271,10 +326,13 @@ covers the new subdomain once added to `extraDomainNames`.
 
 ## 8. Resume checklist
 
-- [ ] Build CLI on each target system; capture real `bunDepsHashes`.
+- [x] Build CLI on `aarch64-darwin`; `bunDepsHashes.aarch64-darwin` captured.
+- [ ] Build CLI on `x86_64-linux` (server/linux builder); capture
+      `bunDepsHashes.x86_64-linux`.
 - [ ] (If FOD won't stabilize) migrate `nodeModules` to `bun2nix`.
-- [ ] Smoke-test `t3 serve --host 127.0.0.1 --port 3773` from the built CLI
-      (watch for `node-pty` / `node:sqlite` runtime errors → §4 risks).
+- [x] Smoke-test `t3 serve` from the built CLI — boots clean on darwin
+      (migrations run, port binds, `node-pty` + `node:sqlite` OK). Re-verify on
+      linux after that build.
 - [ ] Add `.github/workflows/release-fork.yml` (§5); push to `personal`; confirm
       a release with the `.zip` appears.
 - [ ] Fill `desktopHashes.aarch64-darwin` from the published `.zip`.
