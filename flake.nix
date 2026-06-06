@@ -28,7 +28,7 @@
 
     bunDepsHashes = {
       x86_64-linux = lib.fakeHash;
-      aarch64-darwin = "sha256-OWHMBirGRbmEO6ASo06jm0Fn1m4yTkKItHaEnUhoSSw=";
+      aarch64-darwin = "sha256-oaGr15cbv1HmyWvrLoVHR5kBailsL1DARcKUBPG7OJ4=";
     };
 
     systems = [
