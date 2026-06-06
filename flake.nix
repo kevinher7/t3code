@@ -1,8 +1,10 @@
 {
-  description = "T3 Code — CLI built from source + prebuilt desktop app";
+  description = "T3 Code — prebuilt CLI + desktop app";
 
-  # Hybrid flake: `t3-cli` is built from source; `desktop` is a fetched prebuilt
-  # artifact. Design, maintenance steps, and gotchas live in docs/nix-packaging.md.
+  # To update after a new release:
+  #   1. Set version to the new tag (without v prefix)
+  #   2. Build — hash mismatches show the correct values
+  #   3. Update hashes, commit, push
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -16,19 +18,19 @@
 
     owner = "kevinher7";
     repo = "t3code";
-    version = "0.0.24-fork.1";
+    version = "0.0.24-fork.2";
     releaseTag = "v${version}";
 
-    desktopArtifactUrl = arch: ext: "https://github.com/${owner}/${repo}/releases/download/${releaseTag}/T3-Code-${version}-${arch}.${ext}";
+    artifactUrl = name: "https://github.com/${owner}/${repo}/releases/download/${releaseTag}/${name}";
 
-    # Capture each by building with lib.fakeHash (see docs/nix-packaging.md).
-    desktopHashes = {
-      aarch64-darwin = "sha256-ciERSQJOjCWkEFFCZ/t+PJ0TmEpJQILvf3Oaq3GjUQ8=";
-    };
-
-    bunDepsHashes = {
-      x86_64-linux = lib.fakeHash;
-      aarch64-darwin = "sha256-oaGr15cbv1HmyWvrLoVHR5kBailsL1DARcKUBPG7OJ4=";
+    hashes = {
+      cli = {
+        x86_64-linux = lib.fakeHash;
+        aarch64-darwin = lib.fakeHash;
+      };
+      desktop = {
+        aarch64-darwin = lib.fakeHash;
+      };
     };
 
     systems = [
@@ -37,108 +39,29 @@
     ];
 
     forAllSystems = lib.genAttrs systems;
-    pkgsFor = system:
-      import nixpkgs {
-        inherit system;
-        config.allowUnfree = true;
-      };
+    pkgsFor = system: import nixpkgs {inherit system;};
 
     mkCli = system: let
       pkgs = pkgsFor system;
       nodejs = pkgs.nodejs_24;
-
-      # Fixed-output derivation: bun install with network access; output is
-      # hashed, so it is system-specific (native addons differ).
-      nodeModules = pkgs.stdenv.mkDerivation {
-        pname = "t3code-node-modules";
-        inherit version;
-        src = self;
-
-        nativeBuildInputs = [
-          pkgs.bun
-          nodejs
-          pkgs.node-gyp
-          pkgs.python3
-          pkgs.pkg-config
-          pkgs.cacert
-        ];
-
-        dontConfigure = true;
-        dontFixup = true;
-
-        buildPhase = ''
-          runHook preBuild
-          export HOME=$TMPDIR
-          export BUN_INSTALL_CACHE_DIR=$TMPDIR/bun-cache
-          export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
-          export NODE_EXTRA_CA_CERTS=$SSL_CERT_FILE
-          export ELECTRON_SKIP_BINARY_DOWNLOAD=1
-          # node-gyp (node-pty) must use the nixpkgs node headers instead of
-          # downloading them, and be told which python to use.
-          export npm_config_nodedir=${nodejs}
-          export npm_config_python=${pkgs.python3}/bin/python3
-          bun install --frozen-lockfile --no-progress
-          runHook postBuild
-        '';
-
-        # Capture every workspace node_modules (bun isolated linker).
-        installPhase = ''
-          runHook preInstall
-          mkdir -p $out
-          find . -type d -name node_modules -prune -print0 \
-            | while IFS= read -r -d "" d; do
-                mkdir -p "$out/$(dirname "$d")"
-                cp -R "$d" "$out/$(dirname "$d")/"
-              done
-          runHook postInstall
-        '';
-
-        outputHashMode = "recursive";
-        outputHashAlgo = "sha256";
-        outputHash = bunDepsHashes.${system};
-      };
     in
-      pkgs.stdenv.mkDerivation {
+      pkgs.stdenvNoCC.mkDerivation {
         pname = "t3code-cli";
         inherit version;
-        src = self;
 
-        nativeBuildInputs = [
-          nodejs
-          pkgs.bun
-          pkgs.makeWrapper
-        ];
+        src = pkgs.fetchurl {
+          url = artifactUrl "t3code-cli-${system}.tar.gz";
+          hash = hashes.cli.${system};
+        };
 
-        dontConfigure = true;
+        nativeBuildInputs = [pkgs.makeWrapper];
+        sourceRoot = ".";
 
-        # Restore the workspace node_modules layout, then build offline.
-        buildPhase = ''
-          runHook preBuild
-          export HOME=$TMPDIR
-          export TURBO_TELEMETRY_DISABLED=1
-          export DO_NOT_TRACK=1
-
-          for d in $(cd ${nodeModules} && find . -type d -name node_modules -prune); do
-            mkdir -p "$(dirname "$d")"
-            cp -R "${nodeModules}/$d" "$d"
-            chmod -R u+w "$d"
-          done
-
-          ./node_modules/.bin/turbo run build --filter=t3 --no-daemon
-          runHook postBuild
-        '';
-
-        # Reproduce the apps/server/dist -> node_modules layout so bin.mjs
-        # resolves its (external) npm deps at runtime, then drop dangling
-        # @t3tools/* symlinks (inlined into bin.mjs by tsdown).
         installPhase = ''
           runHook preInstall
-          mkdir -p $out/libexec/t3code/apps/server
-
-          cp -R node_modules $out/libexec/t3code/node_modules
-          cp -R apps/server/dist $out/libexec/t3code/apps/server/dist
-          cp -R apps/server/node_modules $out/libexec/t3code/apps/server/node_modules
-          find $out/libexec/t3code -xtype l -delete
+          mkdir -p $out/libexec/t3code
+          cp -R node_modules apps $out/libexec/t3code/
+          find $out/libexec/t3code -xtype l -delete 2>/dev/null || true
 
           makeWrapper ${nodejs}/bin/node $out/bin/t3 \
             --add-flags "$out/libexec/t3code/apps/server/dist/bin.mjs" \
@@ -147,29 +70,27 @@
         '';
 
         meta = {
-          description = "T3 Code headless CLI (`t3 serve`)";
+          description = "T3 Code CLI";
           homepage = "https://t3.codes";
           license = lib.licenses.mit;
           mainProgram = "t3";
-          platforms = systems;
+          platforms = [system];
         };
       };
 
-    # macOS: unpack the prebuilt .zip and expose the .app for nix-darwin.
     mkDesktopDarwin = system: let
       pkgs = pkgsFor system;
     in
-      pkgs.stdenv.mkDerivation {
+      pkgs.stdenvNoCC.mkDerivation {
         pname = "t3code-desktop";
         inherit version;
 
         src = pkgs.fetchurl {
-          url = desktopArtifactUrl "arm64" "zip";
-          hash = desktopHashes.${system};
+          url = artifactUrl "T3-Code-${version}-arm64.zip";
+          hash = hashes.desktop.${system};
         };
 
         nativeBuildInputs = [pkgs.unzip];
-
         sourceRoot = ".";
         unpackPhase = "unzip -q $src";
 
@@ -191,7 +112,6 @@
     packages = forAllSystems (
       system: let
         cli = mkCli system;
-        # Linux desktop intentionally deferred (see docs/nix-packaging.md).
         desktop = {aarch64-darwin = mkDesktopDarwin;}.${system} or null;
       in
         {
@@ -207,6 +127,14 @@
       default = {
         type = "app";
         program = "${self.packages.${system}.t3-cli}/bin/t3";
+      };
+    });
+
+    devShells = forAllSystems (system: let
+      pkgs = pkgsFor system;
+    in {
+      default = pkgs.mkShell {
+        packages = with pkgs; [bun nodejs turbo];
       };
     });
 

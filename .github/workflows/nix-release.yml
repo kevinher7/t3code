@@ -8,7 +8,7 @@ on:
       version:
         description: "Version to build (without v prefix)"
         required: true
-        default: "0.0.24"
+        default: "0.0.24-fork.1"
 
 permissions:
   contents: write
@@ -41,7 +41,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build unsigned macOS artifact
+      - name: Build desktop artifact
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
@@ -52,17 +52,65 @@ jobs:
             --build-version "${{ steps.version.outputs.version }}" \
             --verbose
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-arm64
-          path: release/T3-Code-*
+      - name: Package CLI tarball
+        run: |
+          find node_modules apps/server/node_modules -xtype l -delete 2>/dev/null || true
+          tar -czf release/t3code-cli-aarch64-darwin.tar.gz \
+            node_modules \
+            apps/server/dist \
+            apps/server/node_modules
 
       - name: Create release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          files: release/T3-Code-*.zip
-          draft: false
-          prerelease: false
+          files: |
+            release/T3-Code-*.zip
+            release/t3code-cli-aarch64-darwin.tar.gz
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build CLI
+        run: ./node_modules/.bin/turbo run build --filter=t3
+
+      - name: Package CLI tarball
+        run: |
+          mkdir -p release
+          find node_modules apps/server/node_modules -xtype l -delete 2>/dev/null || true
+          tar -czf release/t3code-cli-x86_64-linux.tar.gz \
+            node_modules \
+            apps/server/dist \
+            apps/server/node_modules
+
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          files: release/t3code-cli-x86_64-linux.tar.gz
