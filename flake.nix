@@ -23,7 +23,7 @@
 
     # Capture each by building with lib.fakeHash (see docs/nix-packaging.md).
     desktopHashes = {
-      aarch64-darwin = "sha256-sgWeYe9Rc3KKPkqb+l4eFeT3QHRrsy7HC0UukJe8KQM=";
+      aarch64-darwin = "sha256-ciERSQJOjCWkEFFCZ/t+PJ0TmEpJQILvf3Oaq3GjUQ8=";
     };
 
     bunDepsHashes = {
