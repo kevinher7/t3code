@@ -1,10 +1,11 @@
 {
   description = "T3 Code — prebuilt CLI + desktop app";
 
-  # To update after a new release:
-  #   1. Set version to the new tag (without v prefix)
-  #   2. Build — hash mismatches show the correct values
-  #   3. Update hashes, commit, push
+  # Releases are automated: push a tag (e.g. `git tag v0.0.24-fork.3 && git push
+  # origin v0.0.24-fork.3`) and `.github/workflows/nix-release.yml` builds the
+  # artifacts, computes their hashes, and commits the updated `nix-hashes.json`
+  # back to `personal`. Do not edit `nix-hashes.json` by hand.
+  # See docs/ci-auto-hash-plan.md.
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -18,20 +19,15 @@
 
     owner = "kevinher7";
     repo = "t3code";
-    version = "0.0.24-fork.2";
+
+    # Version + artifact hashes are written by CI on tag push (see header comment).
+    release = builtins.fromJSON (builtins.readFile ./nix-hashes.json);
+    version = release.version;
     releaseTag = "v${version}";
 
     artifactUrl = name: "https://github.com/${owner}/${repo}/releases/download/${releaseTag}/${name}";
 
-    hashes = {
-      cli = {
-        x86_64-linux = "sha256-MKkdYGEMLT4LGp9seI5cQdCCpMONC5S52aCR7oKJowM=";
-        aarch64-darwin = "sha256-QzDqz5wD/tmljzrY3qZhGLfN1lbx6kBNbn9lDioNOMM=";
-      };
-      desktop = {
-        aarch64-darwin = "sha256-XyAzA+xKpElXW6s4BuSZUMvRcEqmhUs8bAYu92gKyVI=";
-      };
-    };
+    hashes = {inherit (release) cli desktop;};
 
     systems = [
       "x86_64-linux"

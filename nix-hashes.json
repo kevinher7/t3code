@@ -1,0 +1,10 @@
+{
+  "version": "0.0.24-fork.2",
+  "cli": {
+    "x86_64-linux": "sha256-MKkdYGEMLT4LGp9seI5cQdCCpMONC5S52aCR7oKJowM=",
+    "aarch64-darwin": "sha256-QzDqz5wD/tmljzrY3qZhGLfN1lbx6kBNbn9lDioNOMM="
+  },
+  "desktop": {
+    "aarch64-darwin": "sha256-XyAzA+xKpElXW6s4BuSZUMvRcEqmhUs8bAYu92gKyVI="
+  }
+}

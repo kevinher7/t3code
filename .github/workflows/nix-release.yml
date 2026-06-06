@@ -114,3 +114,69 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           files: release/t3code-cli-x86_64-linux.tar.gz
+
+  update-hashes:
+    needs: [build-macos, build-linux]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: personal
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Download release artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p artifacts
+          gh release download "${GITHUB_REF_NAME}" \
+            --repo "${{ github.repository }}" \
+            --dir artifacts \
+            --pattern 't3code-cli-*.tar.gz' \
+            --pattern 'T3-Code-*-arm64.zip'
+
+      - name: Compute hashes and write nix-hashes.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          CLI_DARWIN=$(nix hash file --sri --type sha256 artifacts/t3code-cli-aarch64-darwin.tar.gz)
+          CLI_LINUX=$(nix hash file --sri --type sha256 artifacts/t3code-cli-x86_64-linux.tar.gz)
+          DESKTOP=$(nix hash file --sri --type sha256 artifacts/T3-Code-*-arm64.zip)
+
+          echo "version:        $VERSION"
+          echo "cli linux:      $CLI_LINUX"
+          echo "cli darwin:     $CLI_DARWIN"
+          echo "desktop darwin: $DESKTOP"
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg cli_linux "$CLI_LINUX" \
+            --arg cli_darwin "$CLI_DARWIN" \
+            --arg desktop "$DESKTOP" \
+            '{
+              version: $version,
+              cli: {
+                "x86_64-linux": $cli_linux,
+                "aarch64-darwin": $cli_darwin
+              },
+              desktop: {
+                "aarch64-darwin": $desktop
+              }
+            }' > nix-hashes.json
+
+          cat nix-hashes.json
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add nix-hashes.json
+          if git diff --cached --quiet; then
+            echo "nix-hashes.json already up to date"
+            exit 0
+          fi
+          git commit -m "chore(release): update artifact hashes for ${GITHUB_REF_NAME}"
+          git push origin HEAD:personal
