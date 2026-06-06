@@ -16,7 +16,7 @@
 
     owner = "kevinher7";
     repo = "t3code";
-    version = "0.0.24";
+    version = "0.0.24-fork.1";
     releaseTag = "v${version}";
 
     desktopArtifactUrl = arch: ext: "https://github.com/${owner}/${repo}/releases/download/${releaseTag}/T3-Code-${version}-${arch}.${ext}";
