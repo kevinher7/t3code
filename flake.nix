@@ -57,6 +57,7 @@
         nativeBuildInputs = [
           pkgs.bun
           nodejs
+          pkgs.node-gyp
           pkgs.python3
           pkgs.pkg-config
           pkgs.cacert
