@@ -26,10 +26,10 @@
     hashes = {
       cli = {
         x86_64-linux = lib.fakeHash;
-        aarch64-darwin = lib.fakeHash;
+        aarch64-darwin = "sha256-QzDqz5wD/tmljzrY3qZhGLfN1lbx6kBNbn9lDioNOMM=";
       };
       desktop = {
-        aarch64-darwin = lib.fakeHash;
+        aarch64-darwin = "sha256-XyAzA+xKpElXW6s4BuSZUMvRcEqmhUs8bAYu92gKyVI=";
       };
     };
 
