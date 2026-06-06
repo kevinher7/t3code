@@ -25,7 +25,7 @@
 
     hashes = {
       cli = {
-        x86_64-linux = lib.fakeHash;
+        x86_64-linux = "sha256-MKkdYGEMLT4LGp9seI5cQdCCpMONC5S52aCR7oKJowM=";
         aarch64-darwin = "sha256-QzDqz5wD/tmljzrY3qZhGLfN1lbx6kBNbn9lDioNOMM=";
       };
       desktop = {
