@@ -41,7 +41,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
-          vp run dist:desktop:artifact -- \
+          vp run dist:desktop:artifact \
             --platform mac \
             --target zip \
             --arch arm64 \
