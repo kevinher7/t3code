@@ -75,7 +75,8 @@ import {
   selectThreadByRef,
   useStore,
 } from "../store";
-import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
+import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
+import { useThreadRunningTerminalIds } from "../terminalSessionState";
 import { useUiStateStore } from "../uiStateStore";
 import {
   resolveShortcutCommand,
@@ -87,7 +88,7 @@ import {
 } from "../keybindings";
 import { useModelPickerOpen } from "../modelPickerOpenState";
 import { useShortcutModifierState } from "../shortcutModifierState";
-import { useGitStatus } from "../lib/gitStatusState";
+import { useVcsStatus } from "../lib/vcsStatusState";
 import { readLocalApi } from "../localApi";
 import { useComposerDraftStore } from "../composerDraftStore";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
@@ -351,10 +352,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const threadKey = scopedThreadKey(threadRef);
   const lastVisitedAt = useUiStateStore((state) => state.threadLastVisitedAtById[threadKey]);
   const isSelected = useThreadSelectionStore((state) => state.selectedThreadKeys.has(threadKey));
-  const runningTerminalIds = useTerminalStateStore(
-    (state) =>
-      selectThreadTerminalState(state.terminalStateByThreadKey, threadRef).runningTerminalIds,
-  );
+  const runningTerminalIds = useThreadRunningTerminalIds({
+    environmentId: thread.environmentId,
+    threadId: thread.id,
+  });
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const isRemoteThread =
     primaryEnvironmentId !== null && thread.environmentId !== primaryEnvironmentId;
@@ -379,7 +380,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     ),
   );
   const gitCwd = thread.worktreePath ?? threadProjectCwd ?? props.projectCwd;
-  const gitStatus = useGitStatus({
+  const gitStatus = useVcsStatus({
     environmentId: thread.environmentId,
     cwd: thread.branch != null ? gitCwd : null,
   });
@@ -3249,8 +3250,8 @@ export default function Sidebar() {
     () => ({
       terminalFocus: isTerminalFocused(),
       terminalOpen: routeThreadRef
-        ? selectThreadTerminalState(
-            useTerminalStateStore.getState().terminalStateByThreadKey,
+        ? selectThreadTerminalUiState(
+            useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
             routeThreadRef,
           ).terminalOpen
         : false,
@@ -3458,8 +3459,8 @@ export default function Sidebar() {
     () => ({
       terminalFocus: false,
       terminalOpen: routeThreadRef
-        ? selectThreadTerminalState(
-            useTerminalStateStore.getState().terminalStateByThreadKey,
+        ? selectThreadTerminalUiState(
+            useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
             routeThreadRef,
           ).terminalOpen
         : false,
