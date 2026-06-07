@@ -65,7 +65,7 @@ import { usePrimaryEnvironmentId } from "../environments/primary";
 import { isElectron } from "../env";
 import { APP_STAGE_LABEL, APP_VERSION } from "../branding";
 import { isTerminalFocused } from "../lib/terminalFocus";
-import { isMacPlatform, newCommandId } from "../lib/utils";
+import { isMacPlatform, newCommandId, randomUUID } from "../lib/utils";
 import {
   selectProjectByRef,
   selectProjectsAcrossEnvironments,
@@ -2944,7 +2944,7 @@ export default function Sidebar() {
       });
       return;
     }
-    const sharedTagId = TagId.make(crypto.randomUUID());
+    const sharedTagId = TagId.make(randomUUID());
     const createdAt = new Date().toISOString();
     const failures: string[] = [];
     for (const environmentId of environmentIds) {

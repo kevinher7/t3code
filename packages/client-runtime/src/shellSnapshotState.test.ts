@@ -21,6 +21,7 @@ function resetAtomRegistry() {
 const BASE_SNAPSHOT: OrchestrationShellSnapshot = {
   snapshotSequence: 1,
   updatedAt: "2026-04-01T00:00:00.000Z",
+  tags: [],
   projects: [
     {
       id: ProjectId.make("project-1"),
@@ -29,6 +30,7 @@ const BASE_SNAPSHOT: OrchestrationShellSnapshot = {
       repositoryIdentity: null,
       defaultModelSelection: null,
       scripts: [],
+      tags: [],
       createdAt: "2026-04-01T00:00:00.000Z",
       updatedAt: "2026-04-01T00:00:00.000Z",
     },
