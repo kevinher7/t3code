@@ -7,11 +7,14 @@
  * @module ExternalLauncher
  */
 import {
+  CUSTOM_EDITOR_PATH_PLACEHOLDER,
   EDITORS,
   ExternalLauncherError,
+  type CustomEditorDefinition,
   type EditorId,
   type LaunchEditorInput,
 } from "@t3tools/contracts";
+import { customEditorId, isCustomEditorId } from "@t3tools/shared/editors";
 import { isCommandAvailable, type CommandAvailabilityOptions } from "@t3tools/shared/shell";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -107,6 +110,13 @@ function resolveEditorArgs(
 ): ReadonlyArray<string> {
   const baseArgs = "baseArgs" in editor ? editor.baseArgs : [];
   return [...baseArgs, ...resolveCommandEditorArgs(editor, target)];
+}
+
+function resolveCustomEditorLaunch(editor: CustomEditorDefinition, target: string): EditorLaunch {
+  const [command, ...args] = editor.command;
+  const hasPlaceholder = args.some((arg) => arg.includes(CUSTOM_EDITOR_PATH_PLACEHOLDER));
+  const resolvedArgs = args.map((arg) => arg.replaceAll(CUSTOM_EDITOR_PATH_PLACEHOLDER, target));
+  return { command, args: hasPlaceholder ? resolvedArgs : [...resolvedArgs, target] };
 }
 
 function resolveAvailableCommand(
@@ -249,8 +259,13 @@ export interface ExternalLauncherShape {
    * Launch a workspace path in a selected editor integration.
    *
    * Launches the editor as a detached process so server startup is not blocked.
+   * Custom editor ids are resolved against the caller-provided definitions
+   * (sourced from server settings).
    */
-  readonly launchEditor: (input: LaunchEditorInput) => Effect.Effect<void, ExternalLauncherError>;
+  readonly launchEditor: (
+    input: LaunchEditorInput,
+    customEditors?: ReadonlyArray<CustomEditorDefinition>,
+  ) => Effect.Effect<void, ExternalLauncherError>;
 }
 
 /**
@@ -268,12 +283,26 @@ export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
   input: LaunchEditorInput,
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
+  customEditors: ReadonlyArray<CustomEditorDefinition> = [],
 ): Effect.fn.Return<EditorLaunch, ExternalLauncherError> {
   yield* Effect.annotateCurrentSpan({
     "externalLauncher.editor": input.editor,
     "externalLauncher.cwd": input.cwd,
     "externalLauncher.platform": platform,
   });
+  if (isCustomEditorId(input.editor)) {
+    const requestedEditorId = input.editor;
+    const definition = customEditors.find(
+      (editor) => customEditorId(editor.id) === requestedEditorId,
+    );
+    if (!definition) {
+      return yield* new ExternalLauncherError({
+        message: `Unknown custom editor: ${input.editor}`,
+      });
+    }
+    return resolveCustomEditorLaunch(definition, input.cwd);
+  }
+
   const editorDef = EDITORS.find((editor) => editor.id === input.editor);
   if (!editorDef) {
     return yield* new ExternalLauncherError({ message: `Unknown editor: ${input.editor}` });
@@ -352,11 +381,13 @@ const make = Effect.gen(function* () {
       launchBrowser(target).pipe(
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
       ),
-    launchEditor: (input) =>
-      Effect.flatMap(resolveEditorLaunch(input), (launch) =>
-        launchEditorProcess(launch).pipe(
-          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
-        ),
+    launchEditor: (input, customEditors) =>
+      Effect.flatMap(
+        resolveEditorLaunch(input, process.platform, process.env, customEditors),
+        (launch) =>
+          launchEditorProcess(launch).pipe(
+            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+          ),
       ),
   } satisfies ExternalLauncherShape;
 });

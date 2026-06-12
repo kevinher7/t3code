@@ -161,8 +161,10 @@ const makeRunner =
   PRIMARY KEY (migration_id)
 )`,
         pg: () =>
-          Effect.catch(sql`select ${table}::regclass`, () =>
-            sql`CREATE TABLE ${sql(table)} (
+          Effect.catch(
+            sql`select ${table}::regclass`,
+            () =>
+              sql`CREATE TABLE ${sql(table)} (
   migration_id integer primary key,
   created_at timestamp with time zone not null default now(),
   name text not null

@@ -1187,9 +1187,22 @@ const makeWsRpcLayer = (currentSession: AuthenticatedSession) =>
             { "rpc.aggregate": "workspace" },
           ),
         [WS_METHODS.shellOpenInEditor]: (input) =>
-          observeRpcEffect(WS_METHODS.shellOpenInEditor, externalLauncher.launchEditor(input), {
-            "rpc.aggregate": "workspace",
-          }),
+          observeRpcEffect(
+            WS_METHODS.shellOpenInEditor,
+            serverSettings.getSettings.pipe(
+              Effect.mapError(
+                (cause) =>
+                  new ExternalLauncher.ExternalLauncherError({
+                    message: "Failed to load custom editor settings",
+                    cause,
+                  }),
+              ),
+              Effect.flatMap((settings) =>
+                externalLauncher.launchEditor(input, settings.customEditors),
+              ),
+            ),
+            { "rpc.aggregate": "workspace" },
+          ),
         [WS_METHODS.filesystemBrowse]: (input) =>
           observeRpcEffect(
             WS_METHODS.filesystemBrowse,

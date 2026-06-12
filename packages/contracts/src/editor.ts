@@ -41,8 +41,50 @@ export const EDITORS = [
   { id: "file-manager", label: "File Manager", commands: null, launchStyle: "direct-path" },
 ] as const satisfies ReadonlyArray<EditorDefinition>;
 
-export const EditorId = Schema.Literals(EDITORS.map((e) => e.id));
+export const BuiltinEditorId = Schema.Literals(EDITORS.map((e) => e.id));
+export type BuiltinEditorId = typeof BuiltinEditorId.Type;
+
+export const MAX_CUSTOM_EDITOR_ID_LENGTH = 32;
+export const MAX_CUSTOM_EDITORS_COUNT = 32;
+
+/**
+ * Placeholder replaced with the target path when launching a custom editor.
+ * When no command argument contains it, the target path is appended instead.
+ */
+export const CUSTOM_EDITOR_PATH_PLACEHOLDER = "{path}";
+
+export const CUSTOM_EDITOR_ID_PREFIX = "custom:";
+
+export const CustomEditorSlug = Schema.NonEmptyString.check(
+  Schema.isMaxLength(MAX_CUSTOM_EDITOR_ID_LENGTH),
+  Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/),
+);
+export type CustomEditorSlug = typeof CustomEditorSlug.Type;
+
+export const CustomEditorId = Schema.TemplateLiteral([
+  Schema.Literal(CUSTOM_EDITOR_ID_PREFIX),
+  CustomEditorSlug,
+]);
+export type CustomEditorId = typeof CustomEditorId.Type;
+
+export const EditorId = Schema.Union([BuiltinEditorId, CustomEditorId]);
 export type EditorId = typeof EditorId.Type;
+
+/**
+ * User-defined editor launched via an arbitrary command, e.g. a terminal
+ * editor wrapped in a terminal emulator: `["ghostty", "-e", "nvim", "{path}"]`.
+ */
+export const CustomEditorDefinition = Schema.Struct({
+  id: CustomEditorSlug,
+  name: TrimmedNonEmptyString,
+  command: Schema.NonEmptyArray(TrimmedNonEmptyString),
+});
+export type CustomEditorDefinition = typeof CustomEditorDefinition.Type;
+
+export const CustomEditorsConfig = Schema.Array(CustomEditorDefinition).check(
+  Schema.isMaxLength(MAX_CUSTOM_EDITORS_COUNT),
+);
+export type CustomEditorsConfig = typeof CustomEditorsConfig.Type;
 
 export const LaunchEditorInput = Schema.Struct({
   cwd: TrimmedNonEmptyString,

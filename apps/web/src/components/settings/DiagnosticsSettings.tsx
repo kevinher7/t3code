@@ -18,9 +18,13 @@ import * as Option from "effect/Option";
 
 import { ensureLocalApi } from "../../localApi";
 import { cn } from "../../lib/utils";
-import { resolveAndPersistPreferredEditor } from "../../editorPreferences";
+import { resolveAndPersistPreferredEditor, selectableEditorIds } from "../../editorPreferences";
 import { formatRelativeTime } from "../../timestampFormat";
-import { useServerAvailableEditors, useServerObservability } from "../../rpc/serverState";
+import {
+  useServerAvailableEditors,
+  useServerCustomEditors,
+  useServerObservability,
+} from "../../rpc/serverState";
 import {
   useProcessDiagnostics,
   useProcessResourceHistory,
@@ -805,6 +809,7 @@ function DiagnosticsRefreshButton({
 export function DiagnosticsSettingsPanel() {
   const observability = useServerObservability();
   const availableEditors = useServerAvailableEditors();
+  const customEditors = useServerCustomEditors();
   const [resourceWindowMs, setResourceWindowMs] = useState(15 * 60_000);
   const selectedResourceWindow =
     RESOURCE_HISTORY_WINDOWS.find((option) => option.windowMs === resourceWindowMs) ??
@@ -833,7 +838,9 @@ export function DiagnosticsSettingsPanel() {
     const logsDirectoryPath = observability?.logsDirectoryPath ?? null;
     if (!logsDirectoryPath) return;
 
-    const editor = resolveAndPersistPreferredEditor(availableEditors ?? []);
+    const editor = resolveAndPersistPreferredEditor(
+      selectableEditorIds(availableEditors ?? [], customEditors),
+    );
     if (!editor) {
       setOpenLogsDirectoryError("No available editors found.");
       return;
@@ -851,7 +858,7 @@ export function DiagnosticsSettingsPanel() {
       .finally(() => {
         setIsOpeningLogsDirectory(false);
       });
-  }, [availableEditors, observability?.logsDirectoryPath]);
+  }, [availableEditors, customEditors, observability?.logsDirectoryPath]);
 
   const isInitialLoading = isPending && data === null;
   const isProcessInitialLoading = isProcessPending && processData === null;
