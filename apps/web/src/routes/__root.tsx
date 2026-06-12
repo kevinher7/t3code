@@ -28,7 +28,7 @@ import {
   ToastProvider,
   toastManager,
 } from "../components/ui/toast";
-import { resolveAndPersistPreferredEditor } from "../editorPreferences";
+import { resolveAndPersistPreferredEditor, selectableEditorIds } from "../editorPreferences";
 import { readLocalApi } from "../localApi";
 import { useSettings } from "../hooks/useSettings";
 import {
@@ -384,7 +384,9 @@ function EventRouter() {
 
               void Promise.resolve(serverConfig ?? api.server.getConfig())
                 .then((config) => {
-                  const editor = resolveAndPersistPreferredEditor(config.availableEditors);
+                  const editor = resolveAndPersistPreferredEditor(
+                    selectableEditorIds(config.availableEditors, config.settings.customEditors),
+                  );
                   if (!editor) {
                     throw new Error("No available editors found.");
                   }

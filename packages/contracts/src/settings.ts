@@ -3,6 +3,7 @@ import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import { TrimmedNonEmptyString, TrimmedString } from "./baseSchemas.ts";
+import { CustomEditorsConfig } from "./editor.ts";
 import { DEFAULT_GIT_TEXT_GENERATION_MODEL, ProviderOptionSelections } from "./model.ts";
 import { ModelSelection } from "./orchestration.ts";
 import { ProviderInstanceConfig, ProviderInstanceId } from "./providerInstance.ts";
@@ -374,6 +375,10 @@ export const ServerSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed("local" as const satisfies ThreadEnvMode)),
   ),
   addProjectBaseDirectory: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  // User-defined "Open in" editors (e.g. nvim wrapped in a terminal
+  // emulator). Edited by hand in settings.json; the file watcher hot-reloads
+  // changes and streams them to clients via the server config subscription.
+  customEditors: CustomEditorsConfig.pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   textGenerationModelSelection: ModelSelection.pipe(
     Schema.withDecodingDefault(
       Effect.succeed({

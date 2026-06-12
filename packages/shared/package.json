@@ -39,6 +39,10 @@
       "types": "./src/shell.ts",
       "import": "./src/shell.ts"
     },
+    "./editors": {
+      "types": "./src/editors.ts",
+      "import": "./src/editors.ts"
+    },
     "./semver": {
       "types": "./src/semver.ts",
       "import": "./src/semver.ts"

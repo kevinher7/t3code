@@ -478,6 +478,81 @@ it.layer(NodeServices.layer)("resolveEditorLaunch", (it) => {
     }),
   );
 
+  it.effect("resolves custom editors with {path} placeholder substitution", () =>
+    Effect.gen(function* () {
+      const customEditors = [
+        {
+          id: "nvim-ghostty",
+          name: "Neovim (Ghostty)",
+          command: ["ghostty", "-e", "nvim", "{path}"] as const,
+        },
+      ];
+
+      const launch = yield* resolveEditorLaunch(
+        { cwd: "/tmp/workspace", editor: "custom:nvim-ghostty" },
+        "darwin",
+        { PATH: "" },
+        customEditors,
+      );
+      assert.deepEqual(launch, {
+        command: "ghostty",
+        args: ["-e", "nvim", "/tmp/workspace"],
+      });
+    }),
+  );
+
+  it.effect("appends the target path when a custom editor command has no placeholder", () =>
+    Effect.gen(function* () {
+      const customEditors = [{ id: "nvim", name: "Neovim", command: ["nvim"] as const }];
+
+      const launch = yield* resolveEditorLaunch(
+        { cwd: "/tmp/workspace", editor: "custom:nvim" },
+        "darwin",
+        { PATH: "" },
+        customEditors,
+      );
+      assert.deepEqual(launch, {
+        command: "nvim",
+        args: ["/tmp/workspace"],
+      });
+    }),
+  );
+
+  it.effect("substitutes the placeholder in every argument containing it", () =>
+    Effect.gen(function* () {
+      const customEditors = [
+        {
+          id: "wezterm-nvim",
+          name: "Neovim (WezTerm)",
+          command: ["wezterm", "start", "--cwd={path}", "nvim", "{path}"] as const,
+        },
+      ];
+
+      const launch = yield* resolveEditorLaunch(
+        { cwd: "/tmp/workspace", editor: "custom:wezterm-nvim" },
+        "linux",
+        { PATH: "" },
+        customEditors,
+      );
+      assert.deepEqual(launch, {
+        command: "wezterm",
+        args: ["start", "--cwd=/tmp/workspace", "nvim", "/tmp/workspace"],
+      });
+    }),
+  );
+
+  it.effect("fails for custom editor ids without a matching definition", () =>
+    Effect.gen(function* () {
+      const result = yield* resolveEditorLaunch(
+        { cwd: "/tmp/workspace", editor: "custom:missing" },
+        "darwin",
+        { PATH: "" },
+        [],
+      ).pipe(Effect.result);
+      assert.equal(result._tag, "Failure");
+    }),
+  );
+
   it.effect("maps file-manager editor to OS open commands", () =>
     Effect.gen(function* () {
       const launch1 = yield* resolveEditorLaunch(

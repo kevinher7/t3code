@@ -1,8 +1,14 @@
-import { EditorId, type ResolvedKeybindingsConfig } from "@t3tools/contracts";
+import {
+  EditorId,
+  type CustomEditorDefinition,
+  type ResolvedKeybindingsConfig,
+} from "@t3tools/contracts";
+import { customEditorId } from "@t3tools/shared/editors";
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { isOpenFavoriteEditorShortcut, shortcutLabelForCommand } from "../../keybindings";
-import { usePreferredEditor } from "../../editorPreferences";
-import { ChevronDownIcon, FolderClosedIcon } from "lucide-react";
+import { selectableEditorIds, usePreferredEditor } from "../../editorPreferences";
+import { useServerCustomEditors } from "../../rpc/serverState";
+import { ChevronDownIcon, FolderClosedIcon, SquareTerminalIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import { Group, GroupSeparator } from "../ui/group";
 import { Menu, MenuItem, MenuPopup, MenuShortcut, MenuTrigger } from "../ui/menu";
@@ -33,8 +39,13 @@ import {
 } from "../JetBrainsIcons";
 import { isMacPlatform, isWindowsPlatform } from "~/lib/utils";
 import { readLocalApi } from "~/localApi";
+import { toastManager } from "../ui/toast";
 
-const resolveOptions = (platform: string, availableEditors: ReadonlyArray<EditorId>) => {
+const resolveOptions = (
+  platform: string,
+  availableEditors: ReadonlyArray<EditorId>,
+  customEditors: ReadonlyArray<CustomEditorDefinition>,
+) => {
   const baseOptions: ReadonlyArray<{ label: string; Icon: Icon; value: EditorId }> = [
     {
       label: "Cursor",
@@ -147,7 +158,15 @@ const resolveOptions = (platform: string, availableEditors: ReadonlyArray<Editor
     },
   ];
   const availableEditorSet = new Set(availableEditors);
-  return baseOptions.filter((option) => availableEditorSet.has(option.value));
+  const customOptions = customEditors.map(({ id, name }) => ({
+    label: name,
+    Icon: SquareTerminalIcon as Icon,
+    value: customEditorId(id),
+  }));
+  return [
+    ...baseOptions.filter((option) => availableEditorSet.has(option.value)),
+    ...customOptions,
+  ];
 };
 
 export const OpenInPicker = memo(function OpenInPicker({
@@ -159,10 +178,15 @@ export const OpenInPicker = memo(function OpenInPicker({
   availableEditors: ReadonlyArray<EditorId>;
   openInCwd: string | null;
 }) {
-  const [preferredEditor, setPreferredEditor] = usePreferredEditor(availableEditors);
+  const customEditors = useServerCustomEditors();
+  const selectableEditors = useMemo(
+    () => selectableEditorIds(availableEditors, customEditors),
+    [availableEditors, customEditors],
+  );
+  const [preferredEditor, setPreferredEditor] = usePreferredEditor(selectableEditors);
   const options = useMemo(
-    () => resolveOptions(navigator.platform, availableEditors),
-    [availableEditors],
+    () => resolveOptions(navigator.platform, availableEditors, customEditors),
+    [availableEditors, customEditors],
   );
   const primaryOption = options.find(({ value }) => value === preferredEditor) ?? null;
 
@@ -172,7 +196,13 @@ export const OpenInPicker = memo(function OpenInPicker({
       if (!api || !openInCwd) return;
       const editor = editorId ?? preferredEditor;
       if (!editor) return;
-      void api.shell.openInEditor(openInCwd, editor);
+      void api.shell.openInEditor(openInCwd, editor).catch((error: unknown) => {
+        toastManager.add({
+          type: "error",
+          title: "Unable to open editor",
+          description: error instanceof Error ? error.message : "Unknown error opening editor.",
+        });
+      });
       setPreferredEditor(editor);
     },
     [preferredEditor, openInCwd, setPreferredEditor],
@@ -185,17 +215,15 @@ export const OpenInPicker = memo(function OpenInPicker({
 
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
-      const api = readLocalApi();
       if (!isOpenFavoriteEditorShortcut(e, keybindings)) return;
-      if (!api || !openInCwd) return;
-      if (!preferredEditor) return;
+      if (!openInCwd || !preferredEditor) return;
 
       e.preventDefault();
-      void api.shell.openInEditor(openInCwd, preferredEditor);
+      openInEditor(preferredEditor);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [preferredEditor, keybindings, openInCwd]);
+  }, [preferredEditor, keybindings, openInCwd, openInEditor]);
 
   return (
     <Group aria-label="Subscription actions">
