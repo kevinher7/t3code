@@ -56,11 +56,16 @@
         installPhase = ''
           runHook preInstall
           mkdir -p $out/libexec/t3code
-          cp -R node_modules apps $out/libexec/t3code/
+          # The release tarball is a pruned `pnpm deploy --prod` tree: the bundled
+          # CLI output (dist/bin.mjs) plus only the runtime dependency closure,
+          # with node_modules/, dist/, and package.json at the tarball root.
+          cp -R node_modules dist package.json $out/libexec/t3code/
+          # Drop the workspace self-reference symlink (and any other dangling
+          # links); the prod runtime symlinks into .pnpm are relative and survive.
           find $out/libexec/t3code -xtype l -delete 2>/dev/null || true
 
           makeWrapper ${nodejs}/bin/node $out/bin/t3 \
-            --add-flags "$out/libexec/t3code/apps/server/dist/bin.mjs" \
+            --add-flags "$out/libexec/t3code/dist/bin.mjs" \
             --prefix PATH : ${lib.makeBinPath [nodejs]}
           runHook postInstall
         '';

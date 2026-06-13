@@ -48,13 +48,22 @@ jobs:
             --build-version "${{ steps.version.outputs.version }}" \
             --verbose
 
+      - name: Build CLI
+        run: vp run --filter t3 build
+
       - name: Package CLI tarball
         run: |
-          find node_modules apps/server/node_modules -xtype l -delete 2>/dev/null || true
-          tar -czf release/t3code-cli-aarch64-darwin.tar.gz \
+          mkdir -p release
+          # Produce a pruned production tree (bundle dist/ + only runtime deps)
+          # instead of taring the full multi-GB node_modules. pnpm deploy resolves
+          # the prod dependency closure for the `t3` package into a self-contained
+          # dir containing dist/, node_modules/, and package.json.
+          rm -rf cli-deploy
+          pnpm --filter t3 deploy --prod --legacy cli-deploy
+          tar -czf release/t3code-cli-aarch64-darwin.tar.gz -C cli-deploy \
             node_modules \
-            apps/server/dist \
-            apps/server/node_modules
+            dist \
+            package.json
 
       - name: Create release
         if: startsWith(github.ref, 'refs/tags/')
@@ -94,11 +103,16 @@ jobs:
       - name: Package CLI tarball
         run: |
           mkdir -p release
-          find node_modules apps/server/node_modules -xtype l -delete 2>/dev/null || true
-          tar -czf release/t3code-cli-x86_64-linux.tar.gz \
+          # Produce a pruned production tree (bundle dist/ + only runtime deps)
+          # instead of taring the full multi-GB node_modules. pnpm deploy resolves
+          # the prod dependency closure for the `t3` package into a self-contained
+          # dir containing dist/, node_modules/, and package.json.
+          rm -rf cli-deploy
+          pnpm --filter t3 deploy --prod --legacy cli-deploy
+          tar -czf release/t3code-cli-x86_64-linux.tar.gz -C cli-deploy \
             node_modules \
-            apps/server/dist \
-            apps/server/node_modules
+            dist \
+            package.json
 
       - name: Create release
         if: startsWith(github.ref, 'refs/tags/')
