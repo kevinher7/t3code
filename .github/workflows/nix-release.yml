@@ -51,6 +51,13 @@ jobs:
       - name: Build CLI
         run: vp run --filter t3 build
 
+      - name: Enable pnpm
+        # Vite+ embeds pnpm but does not expose a standalone `pnpm` on PATH,
+        # and `vp` has no `deploy` command. Activate the repo's pinned pnpm
+        # (the `packageManager` field) via corepack so the deploy step below
+        # can resolve the production dependency closure.
+        run: corepack enable
+
       - name: Package CLI tarball
         run: |
           mkdir -p release
@@ -99,6 +106,13 @@ jobs:
 
       - name: Build CLI
         run: vp run --filter t3 build
+
+      - name: Enable pnpm
+        # Vite+ embeds pnpm but does not expose a standalone `pnpm` on PATH,
+        # and `vp` has no `deploy` command. Activate the repo's pinned pnpm
+        # (the `packageManager` field) via corepack so the deploy step below
+        # can resolve the production dependency closure.
+        run: corepack enable
 
       - name: Package CLI tarball
         run: |
