@@ -51,22 +51,24 @@ jobs:
       - name: Build CLI
         run: vp run --filter t3 build
 
-      - name: Enable pnpm
-        # Vite+ embeds pnpm but does not expose a standalone `pnpm` on PATH,
-        # and `vp` has no `deploy` command. Activate the repo's pinned pnpm
-        # (the `packageManager` field) via corepack so the deploy step below
-        # can resolve the production dependency closure.
-        run: corepack enable
-
       - name: Package CLI tarball
+        env:
+          # Skip corepack's interactive "download this package manager?" prompt
+          # so the pinned pnpm auto-installs non-interactively in CI.
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
         run: |
           mkdir -p release
           # Produce a pruned production tree (bundle dist/ + only runtime deps)
           # instead of taring the full multi-GB node_modules. pnpm deploy resolves
           # the prod dependency closure for the `t3` package into a self-contained
           # dir containing dist/, node_modules/, and package.json.
+          #
+          # Vite+ embeds pnpm but does not expose a standalone `pnpm` on PATH, and
+          # `corepack enable`'s shims do not land on PATH under the `vp` toolchain.
+          # Invoke pnpm *through* corepack instead: it launches the repo's pinned
+          # pnpm (the `packageManager` field) directly, bypassing PATH entirely.
           rm -rf cli-deploy
-          pnpm --filter t3 deploy --prod --legacy cli-deploy
+          corepack pnpm --filter t3 deploy --prod --legacy cli-deploy
           tar -czf release/t3code-cli-aarch64-darwin.tar.gz -C cli-deploy \
             node_modules \
             dist \
@@ -107,22 +109,24 @@ jobs:
       - name: Build CLI
         run: vp run --filter t3 build
 
-      - name: Enable pnpm
-        # Vite+ embeds pnpm but does not expose a standalone `pnpm` on PATH,
-        # and `vp` has no `deploy` command. Activate the repo's pinned pnpm
-        # (the `packageManager` field) via corepack so the deploy step below
-        # can resolve the production dependency closure.
-        run: corepack enable
-
       - name: Package CLI tarball
+        env:
+          # Skip corepack's interactive "download this package manager?" prompt
+          # so the pinned pnpm auto-installs non-interactively in CI.
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
         run: |
           mkdir -p release
           # Produce a pruned production tree (bundle dist/ + only runtime deps)
           # instead of taring the full multi-GB node_modules. pnpm deploy resolves
           # the prod dependency closure for the `t3` package into a self-contained
           # dir containing dist/, node_modules/, and package.json.
+          #
+          # Vite+ embeds pnpm but does not expose a standalone `pnpm` on PATH, and
+          # `corepack enable`'s shims do not land on PATH under the `vp` toolchain.
+          # Invoke pnpm *through* corepack instead: it launches the repo's pinned
+          # pnpm (the `packageManager` field) directly, bypassing PATH entirely.
           rm -rf cli-deploy
-          pnpm --filter t3 deploy --prod --legacy cli-deploy
+          corepack pnpm --filter t3 deploy --prod --legacy cli-deploy
           tar -czf release/t3code-cli-x86_64-linux.tar.gz -C cli-deploy \
             node_modules \
             dist \
