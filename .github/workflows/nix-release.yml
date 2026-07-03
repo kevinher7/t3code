@@ -41,6 +41,9 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
+          # electron-builder opens many fds while packing/signing the .app;
+          # the runner's default limit is too low and trips EMFILE during signing.
+          ulimit -n 65536
           vp run dist:desktop:artifact \
             --platform mac \
             --target zip \
