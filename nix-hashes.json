@@ -1,10 +1,10 @@
 {
-  "version": "0.0.27-fork.6",
+  "version": "0.0.28-fork.0",
   "cli": {
-    "x86_64-linux": "sha256-ZwntJUZfBj+Y7af1xUeJuAqb2lTlQx7V8WRmt7LIVgQ=",
-    "aarch64-darwin": "sha256-SYGCQFskhSn9PK7nt5axxglIe9Ehz0+wpLxLhSp9jTY="
+    "x86_64-linux": "sha256-B+83RD/ynK5DopzlOR01vJZpyioilXNLkeWGwN5bWGE=",
+    "aarch64-darwin": "sha256-pV8QRYhenVzpshETc90vXit8wj2Qc15hWodTHz1hP+Y="
   },
   "desktop": {
-    "aarch64-darwin": "sha256-4fphTXzAa5U4H++2e4GuRttCGTBkic5ca+WidNVsWnc="
+    "aarch64-darwin": "sha256-MNDzktGVStfrqzpmbJpU+LOZCAYsYQ7EqtJns4XFvac="
   }
 }
