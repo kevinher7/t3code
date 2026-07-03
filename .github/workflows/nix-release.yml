@@ -41,9 +41,14 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
-          # electron-builder opens many fds while packing/signing the .app;
-          # the runner's default limit is too low and trips EMFILE during signing.
-          ulimit -n 65536
+          # electron-builder ad-hoc signs the entire unpacked node_modules tree
+          # (asarUnpack: **/node_modules/**), opening a huge number of files at
+          # once and tripping EMFILE. macOS caps per-process fds at
+          # kern.maxfilesperproc, which `ulimit -n` alone cannot exceed, so raise
+          # the kernel cap first, then the shell limit.
+          sudo sysctl -w kern.maxfiles=1048576 kern.maxfilesperproc=1048576 || true
+          ulimit -n 1048576 2>/dev/null || ulimit -n unlimited 2>/dev/null || true
+          echo "fd limits -> soft=$(ulimit -Sn) hard=$(ulimit -Hn)"
           vp run dist:desktop:artifact \
             --platform mac \
             --target zip \
