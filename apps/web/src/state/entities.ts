@@ -5,7 +5,10 @@ import type {
   EnvironmentThread,
   EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
-import { mergeEnvironmentThread } from "@t3tools/client-runtime/state/threads";
+import {
+  type EnvironmentThreadStatus,
+  mergeEnvironmentThread,
+} from "@t3tools/client-runtime/state/threads";
 import type {
   OrchestrationMessage,
   OrchestrationProposedPlan,
@@ -21,6 +24,7 @@ import { useMemo } from "react";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentProjects, environmentTags } from "./projects";
 import { environmentServerConfigsAtom } from "./server";
+import { allEnvironmentShellsBootstrappedAtom } from "./shell";
 import { environmentThreadDetails, environmentThreadShells } from "./threads";
 
 const EMPTY_PROJECT_REFS: ReadonlyArray<ScopedProjectRef> = Object.freeze([]);
@@ -43,6 +47,9 @@ const EMPTY_THREAD_SHELL_ATOM = Atom.make<EnvironmentThreadShell | null>(null).p
 );
 const EMPTY_THREAD_DETAIL_ATOM = Atom.make<EnvironmentThread | null>(null).pipe(
   Atom.withLabel("web-thread-detail:empty"),
+);
+const EMPTY_THREAD_STATUS_ATOM = Atom.make<EnvironmentThreadStatus>("empty").pipe(
+  Atom.withLabel("web-thread-status:empty"),
 );
 const EMPTY_MESSAGES_ATOM = Atom.make(EMPTY_MESSAGES).pipe(
   Atom.withLabel("web-thread-messages:empty"),
@@ -118,6 +125,10 @@ export function useThreadShells(): ReadonlyArray<EnvironmentThreadShell> {
   return useAtomValue(environmentThreadShells.threadShellsAtom);
 }
 
+export function useAllEnvironmentShellsBootstrapped(): boolean {
+  return useAtomValue(allEnvironmentShellsBootstrappedAtom);
+}
+
 export function useThreadShellsForProjectRefs(
   refs: ReadonlyArray<ScopedProjectRef>,
 ): ReadonlyArray<EnvironmentThreadShell> {
@@ -137,6 +148,12 @@ export function useThreadShell(ref: ScopedThreadRef | null): EnvironmentThreadSh
 export function useThreadDetail(ref: ScopedThreadRef | null): EnvironmentThread | null {
   return useAtomValue(
     ref === null ? EMPTY_THREAD_DETAIL_ATOM : environmentThreadDetails.detailAtom(ref),
+  );
+}
+
+export function useThreadStatus(ref: ScopedThreadRef | null): EnvironmentThreadStatus {
+  return useAtomValue(
+    ref === null ? EMPTY_THREAD_STATUS_ATOM : environmentThreadDetails.statusAtom(ref),
   );
 }
 
@@ -183,6 +200,25 @@ export function readProject(ref: ScopedProjectRef): EnvironmentProject | null {
 
 export function readThreadShell(ref: ScopedThreadRef): EnvironmentThreadShell | null {
   return appAtomRegistry.get(environmentThreadShells.threadShellAtom(ref));
+}
+
+/** Whether the environment's server understands thread.settle/unsettle.
+    False for pre-settlement servers (capability defaults false on decode),
+    so clients under version skew fall back instead of erroring. */
+export function readEnvironmentSupportsSettlement(environmentId: EnvironmentId): boolean {
+  return (
+    appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities
+      .threadSettlement === true
+  );
+}
+
+/** Whether the environment's server understands thread.snooze/unsnooze.
+    Same version-skew contract as settlement. */
+export function readEnvironmentSupportsSnooze(environmentId: EnvironmentId): boolean {
+  return (
+    appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId)?.environment.capabilities
+      .threadSnooze === true
+  );
 }
 
 export function readThreadDetail(ref: ScopedThreadRef): EnvironmentThread | null {

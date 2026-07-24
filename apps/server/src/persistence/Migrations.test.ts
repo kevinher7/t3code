@@ -4,7 +4,7 @@
  * runner: upstream ids occupy `1..999`, downstream-only ids occupy `>= 5000`.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { migrationEntries } from "./Migrations.ts";
 
