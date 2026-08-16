@@ -1,4 +1,5 @@
 import {
+  buildRemoteOpenUrl,
   EditorId,
   type CustomEditorDefinition,
   type EnvironmentId,
@@ -9,6 +10,13 @@ import { useAtomValue } from "@effect/atom-react";
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { isOpenFavoriteEditorShortcut, shortcutLabelForCommand } from "../../keybindings";
 import { selectableEditorIds, usePreferredEditor } from "../../editorPreferences";
+import {
+  openRemoteEditorUrl,
+  useRemoteCapableEditors,
+  useRemoteOpenHint,
+  useRemoteOpenState,
+} from "../../remoteOpen";
+import { useEnvironment } from "../../state/environments";
 import { primaryServerCustomEditorsAtom } from "~/state/server";
 import { ChevronDownIcon, FolderClosedIcon, SquareTerminalIcon } from "lucide-react";
 import { Button } from "../ui/button";
@@ -49,6 +57,8 @@ type OpenInOption = {
   value: EditorId;
   kind: "brand" | "generic";
 };
+
+const NO_CUSTOM_EDITORS: ReadonlyArray<CustomEditorDefinition> = [];
 
 const resolveOptions = (
   platform: string,
@@ -220,15 +230,24 @@ export const OpenInPicker = memo(function OpenInPicker({
   enableShortcut?: boolean;
 }) {
   const customEditors = useAtomValue(primaryServerCustomEditorsAtom);
-  const selectableEditors = useMemo(
-    () => selectableEditorIds(availableEditors, customEditors),
-    [availableEditors, customEditors],
-  );
   const openInEditorMutation = useAtomCommand(shellEnvironment.openInEditor, "open in editor");
+  const remote = useRemoteOpenState(environmentId);
+  const remoteCapableEditors = useRemoteCapableEditors();
+  const [remoteHintSeen, markRemoteHintSeen] = useRemoteOpenHint();
+  const environmentLabel = useEnvironment(environmentId)?.label ?? "this machine";
+  // Remote mode ignores the server's PATH probe: what matters is what runs on
+  // the viewing machine, which only the desktop app can probe.
+  const effectiveEditors = remote.mode === "local-exec" ? availableEditors : remoteCapableEditors;
+  // Custom editors are server-side commands, so they only exist when the server execs the open.
+  const effectiveCustomEditors = remote.mode === "local-exec" ? customEditors : NO_CUSTOM_EDITORS;
+  const selectableEditors = useMemo(
+    () => selectableEditorIds(effectiveEditors, effectiveCustomEditors),
+    [effectiveEditors, effectiveCustomEditors],
+  );
   const [preferredEditor, setPreferredEditor] = usePreferredEditor(selectableEditors);
   const options = useMemo(
-    () => resolveOptions(navigator.platform, availableEditors, customEditors),
-    [availableEditors, customEditors],
+    () => resolveOptions(navigator.platform, effectiveEditors, effectiveCustomEditors),
+    [effectiveEditors, effectiveCustomEditors],
   );
   const primaryOption = options.find(({ value }) => value === preferredEditor) ?? null;
 
@@ -237,6 +256,23 @@ export const OpenInPicker = memo(function OpenInPicker({
       if (!openInCwd) return;
       const editor = editorId ?? preferredEditor;
       if (!editor) return;
+      if (remote.mode === "remote-unavailable") return;
+      if (remote.mode === "remote-links") {
+        const url = buildRemoteOpenUrl({
+          editor,
+          host: remote.host.host,
+          absolutePath: openInCwd,
+        });
+        if (url === undefined) return;
+        // Only record hint-seen/preferred when the shell actually accepted
+        // the URL (an older desktop build can refuse the editor scheme).
+        void openRemoteEditorUrl(url).then((opened) => {
+          if (!opened) return;
+          markRemoteHintSeen();
+          setPreferredEditor(editor);
+        });
+        return;
+      }
       const result = openInEditorMutation({
         environmentId,
         input: {
@@ -247,7 +283,15 @@ export const OpenInPicker = memo(function OpenInPicker({
       setPreferredEditor(editor);
       return result;
     },
-    [environmentId, openInCwd, openInEditorMutation, preferredEditor, setPreferredEditor],
+    [
+      environmentId,
+      markRemoteHintSeen,
+      openInCwd,
+      openInEditorMutation,
+      preferredEditor,
+      remote,
+      setPreferredEditor,
+    ],
   );
 
   const openFavoriteEditorShortcutLabel = useMemo(
@@ -263,32 +307,20 @@ export const OpenInPicker = memo(function OpenInPicker({
       if (!preferredEditor) return;
 
       e.preventDefault();
-      void openInEditorMutation({
-        environmentId,
-        input: {
-          cwd: openInCwd,
-          editor: preferredEditor,
-        },
-      });
+      void openInEditor(preferredEditor);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [
-    enableShortcut,
-    environmentId,
-    keybindings,
-    openInCwd,
-    openInEditorMutation,
-    preferredEditor,
-  ]);
+  }, [enableShortcut, keybindings, openInCwd, openInEditor, preferredEditor]);
 
   return (
     <Group aria-label="Open in editor">
       <Button
         aria-label={compact ? "Open file in preferred editor" : undefined}
+        className="ps-[8.5px]"
         size="xs"
         variant="outline"
-        disabled={!preferredEditor || !openInCwd}
+        disabled={!preferredEditor || !openInCwd || remote.mode === "remote-unavailable"}
         onClick={() => openInEditor(preferredEditor)}
       >
         {primaryOption?.Icon && (
@@ -321,16 +353,25 @@ export const OpenInPicker = memo(function OpenInPicker({
           <ChevronDownIcon aria-hidden="true" className="size-4" />
         </MenuTrigger>
         <MenuPopup align="end">
-          {options.length === 0 && <MenuItem disabled>No installed editors found</MenuItem>}
-          {options.map(({ label, Icon, value, kind }) => (
-            <MenuItem key={value} onClick={() => openInEditor(value)}>
-              <Icon aria-hidden="true" className={getOpenInIconClass(kind)} />
-              {label}
-              {value === preferredEditor && openFavoriteEditorShortcutLabel && (
-                <MenuShortcut>{openFavoriteEditorShortcutLabel}</MenuShortcut>
+          {remote.mode === "remote-unavailable" ? (
+            <MenuItem disabled>No SSH route to {environmentLabel}</MenuItem>
+          ) : (
+            <>
+              {options.length === 0 && <MenuItem disabled>No installed editors found</MenuItem>}
+              {options.map(({ label, Icon, value, kind }) => (
+                <MenuItem key={value} onClick={() => openInEditor(value)}>
+                  <Icon aria-hidden="true" className={getOpenInIconClass(kind)} />
+                  {label}
+                  {value === preferredEditor && openFavoriteEditorShortcutLabel && (
+                    <MenuShortcut>{openFavoriteEditorShortcutLabel}</MenuShortcut>
+                  )}
+                </MenuItem>
+              ))}
+              {remote.mode === "remote-links" && !remoteHintSeen && (
+                <MenuItem disabled>Opens over SSH. Needs your key on {environmentLabel}</MenuItem>
               )}
-            </MenuItem>
-          ))}
+            </>
+          )}
         </MenuPopup>
       </Menu>
     </Group>

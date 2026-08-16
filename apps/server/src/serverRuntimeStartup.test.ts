@@ -99,6 +99,7 @@ it.effect("launchStartupHeartbeat does not block the caller while counts are loa
           listAllTags: () => Effect.succeed([]),
           getTagById: () => Effect.succeed(Option.none()),
           getThreadDetailSnapshot: () => Effect.succeed(Option.none()),
+          searchThreads: () => Effect.succeed({ matches: [] }),
         }),
         Effect.provideService(AnalyticsService.AnalyticsService, {
           record: () => Effect.void,
@@ -165,6 +166,7 @@ it.effect("resolveAutoBootstrapWelcomeTargets returns existing project and threa
         listAllTags: () => Effect.succeed([]),
         getTagById: () => Effect.succeed(Option.none()),
         getThreadDetailSnapshot: () => Effect.die("unused"),
+        searchThreads: () => Effect.succeed({ matches: [] }),
       }),
       Effect.provideService(OrchestrationEngine.OrchestrationEngineService, {
         readEvents: () => Stream.empty,
@@ -211,6 +213,7 @@ it.effect("resolveAutoBootstrapWelcomeTargets creates a project and thread when 
         listAllTags: () => Effect.succeed([]),
         getTagById: () => Effect.succeed(Option.none()),
         getThreadDetailSnapshot: () => Effect.die("unused"),
+        searchThreads: () => Effect.succeed({ matches: [] }),
       }),
       Effect.provideService(OrchestrationEngine.OrchestrationEngineService, {
         readEvents: () => Stream.empty,
@@ -263,6 +266,7 @@ it.effect("resolveAutoBootstrapWelcomeTargets preserves typed UUID generation fa
         listAllTags: () => Effect.succeed([]),
         getTagById: () => Effect.succeed(Option.none()),
         getThreadDetailSnapshot: () => Effect.die("unused"),
+        searchThreads: () => Effect.succeed({ matches: [] }),
       }),
       Effect.provideService(OrchestrationEngine.OrchestrationEngineService, {
         readEvents: () => Stream.empty,

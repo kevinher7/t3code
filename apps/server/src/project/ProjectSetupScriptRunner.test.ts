@@ -47,6 +47,7 @@ const makeProjectionSnapshotQueryLayer = (project: OrchestrationProject) =>
     listAllTags: () => Effect.succeed([]),
     getTagById: () => Effect.succeed(Option.none()),
     getThreadDetailSnapshot: () => Effect.die("unused"),
+    searchThreads: () => Effect.succeed({ matches: [] }),
   });
 
 const makeTerminalManagerLayer = (
