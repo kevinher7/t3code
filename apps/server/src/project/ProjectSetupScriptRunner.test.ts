@@ -19,7 +19,6 @@ const makeProject = (scripts: OrchestrationProject["scripts"]): OrchestrationPro
   workspaceRoot: "/repo/project",
   defaultModelSelection: null,
   scripts,
-  tags: [],
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   deletedAt: null,
@@ -45,8 +44,6 @@ const makeProjectionSnapshotQueryLayer = (project: OrchestrationProject) =>
     getFullThreadDiffContext: () => Effect.die("unused"),
     getThreadShellById: () => Effect.die("unused"),
     getThreadDetailById: () => Effect.die("unused"),
-    listAllTags: () => Effect.succeed([]),
-    getTagById: () => Effect.succeed(Option.none()),
     getThreadDetailSnapshot: () => Effect.die("unused"),
     searchThreads: () => Effect.succeed({ matches: [] }),
   });

@@ -1,7 +1,5 @@
 import { createEnvironmentProjectAtoms } from "@t3tools/client-runtime/state/projects";
 import { createProjectEnvironmentAtoms } from "@t3tools/client-runtime/state/projects";
-import { createEnvironmentTagAtoms } from "@t3tools/client-runtime/state/projects";
-import { createTagEnvironmentAtoms } from "@t3tools/client-runtime/state/projects";
 import { createEnvironmentRpcQueryAtomFamily } from "@t3tools/client-runtime/state/runtime";
 import { WS_METHODS } from "@t3tools/contracts";
 
@@ -22,11 +20,6 @@ export const projectContentSearch = createEnvironmentRpcQueryAtomFamily(connecti
   idleTtlMs: 60_000,
 });
 export const environmentProjects = createEnvironmentProjectAtoms({
-  catalogValueAtom: environmentCatalog.catalogValueAtom,
-  snapshotAtom: environmentSnapshotAtom,
-});
-export const tagEnvironment = createTagEnvironmentAtoms(connectionAtomRuntime);
-export const environmentTags = createEnvironmentTagAtoms({
   catalogValueAtom: environmentCatalog.catalogValueAtom,
   snapshotAtom: environmentSnapshotAtom,
 });

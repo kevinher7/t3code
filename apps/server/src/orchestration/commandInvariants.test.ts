@@ -23,7 +23,6 @@ const now = "2026-01-01T00:00:00.000Z";
 const readModel: OrchestrationReadModel = {
   snapshotSequence: 2,
   updatedAt: now,
-  tags: [],
   projects: [
     {
       id: ProjectId.make("project-a"),
@@ -34,7 +33,6 @@ const readModel: OrchestrationReadModel = {
         model: "gpt-5-codex",
       },
       scripts: [],
-      tags: [],
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -48,7 +46,6 @@ const readModel: OrchestrationReadModel = {
         model: "gpt-5-codex",
       },
       scripts: [],
-      tags: [],
       createdAt: now,
       updatedAt: now,
       deletedAt: null,

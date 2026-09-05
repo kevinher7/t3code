@@ -18,7 +18,6 @@ function makeProject(id: string, environmentId = "environment"): EnvironmentProj
     repositoryIdentity: null,
     defaultModelSelection: null,
     scripts: [],
-    tags: [],
     createdAt: "2026-07-01T00:00:00.000Z",
     updatedAt: "2026-07-01T00:00:00.000Z",
   };

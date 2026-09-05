@@ -57,7 +57,6 @@ function makeReadModel(input: {
         session: null,
       },
     ],
-    tags: [],
     updatedAt: NOW,
   };
 }

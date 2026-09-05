@@ -429,7 +429,6 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
           repositoryIdentity: null,
           defaultModelSelection: null,
           scripts: [],
-          tags: [],
           createdAt: now,
           updatedAt: now,
         } satisfies OrchestrationProjectShell;
@@ -485,7 +484,6 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
               snapshotSequence: 1,
               projects: [project],
               threads: [thread],
-              tags: [],
               updatedAt: now,
             } satisfies OrchestrationShellSnapshot),
           getThreadShellById: () =>
@@ -590,7 +588,6 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
           repositoryIdentity: null,
           defaultModelSelection: null,
           scripts: [],
-          tags: [],
           createdAt: now,
           updatedAt: now,
         } satisfies OrchestrationProjectShell;
@@ -679,7 +676,6 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
                 snapshotSequence: 1,
                 projects: [project],
                 threads: [thread],
-                tags: [],
                 updatedAt: now,
               } satisfies OrchestrationShellSnapshot),
             getThreadShellById: () => Effect.succeed(Option.some(thread)),

@@ -18,7 +18,6 @@ import { OrchestrationEventStore } from "../../persistence/Services/Orchestratio
 import { ProjectionPendingApprovalRepository } from "../../persistence/Services/ProjectionPendingApprovals.ts";
 import { ProjectionProjectRepository } from "../../persistence/Services/ProjectionProjects.ts";
 import { ProjectionStateRepository } from "../../persistence/Services/ProjectionState.ts";
-import { ProjectionTagRepository } from "../../persistence/Services/ProjectionTags.ts";
 import { ProjectionThreadActivityRepository } from "../../persistence/Services/ProjectionThreadActivities.ts";
 import { type ProjectionThreadActivity } from "../../persistence/Services/ProjectionThreadActivities.ts";
 import {
@@ -38,7 +37,6 @@ import { ProjectionThreadRepository } from "../../persistence/Services/Projectio
 import { ProjectionPendingApprovalRepositoryLive } from "../../persistence/Layers/ProjectionPendingApprovals.ts";
 import { ProjectionProjectRepositoryLive } from "../../persistence/Layers/ProjectionProjects.ts";
 import { ProjectionStateRepositoryLive } from "../../persistence/Layers/ProjectionState.ts";
-import { ProjectionTagRepositoryLive } from "../../persistence/Layers/ProjectionTags.ts";
 import { ProjectionThreadActivityRepositoryLive } from "../../persistence/Layers/ProjectionThreadActivities.ts";
 import { ProjectionThreadMessageRepositoryLive } from "../../persistence/Layers/ProjectionThreadMessages.ts";
 import { ProjectionThreadProposedPlanRepositoryLive } from "../../persistence/Layers/ProjectionThreadProposedPlans.ts";
@@ -46,7 +44,6 @@ import { ProjectionThreadSessionRepositoryLive } from "../../persistence/Layers/
 import { ProjectionTurnRepositoryLive } from "../../persistence/Layers/ProjectionTurns.ts";
 import { ProjectionThreadRepositoryLive } from "../../persistence/Layers/ProjectionThreads.ts";
 import { ServerConfig } from "../../config.ts";
-import { normalizeTagNameForDedup } from "../commandInvariants.ts";
 import {
   OrchestrationProjectionPipeline,
   type OrchestrationProjectionPipelineShape,
@@ -68,7 +65,6 @@ export const ORCHESTRATION_PROJECTOR_NAMES = {
   threadTurns: "projection.thread-turns",
   checkpoints: "projection.checkpoints",
   pendingApprovals: "projection.pending-approvals",
-  tags: "projection.tags",
 } as const;
 
 type ProjectorName =
@@ -496,7 +492,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
     const eventStore = yield* OrchestrationEventStore;
     const projectionStateRepository = yield* ProjectionStateRepository;
     const projectionProjectRepository = yield* ProjectionProjectRepository;
-    const projectionTagRepository = yield* ProjectionTagRepository;
     const projectionThreadRepository = yield* ProjectionThreadRepository;
     const projectionThreadMessageRepository = yield* ProjectionThreadMessageRepository;
     const projectionThreadProposedPlanRepository = yield* ProjectionThreadProposedPlanRepository;
@@ -522,7 +517,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             defaultThreadEnvMode: null,
             faviconPath: event.payload.faviconPath ?? null,
             scripts: event.payload.scripts,
-            tags: event.payload.tags,
             createdAt: event.payload.createdAt,
             updatedAt: event.payload.updatedAt,
             deletedAt: null,
@@ -552,7 +546,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
               ? { faviconPath: event.payload.faviconPath }
               : {}),
             ...(event.payload.scripts !== undefined ? { scripts: event.payload.scripts } : {}),
-            ...(event.payload.tags !== undefined ? { tags: event.payload.tags } : {}),
             updatedAt: event.payload.updatedAt,
           });
           return;
@@ -577,47 +570,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           return;
       }
     });
-
-    const applyTagsProjection: ProjectorDefinition["apply"] = Effect.fn("applyTagsProjection")(
-      function* (event, _attachmentSideEffects) {
-        switch (event.type) {
-          case "tag.created":
-            yield* projectionTagRepository.upsert({
-              tagId: event.payload.tagId,
-              name: event.payload.name,
-              nameNormalized: normalizeTagNameForDedup(event.payload.name),
-              createdAt: event.payload.createdAt,
-              updatedAt: event.payload.updatedAt,
-            });
-            return;
-
-          case "tag.renamed": {
-            const existingRow = yield* projectionTagRepository.getById({
-              tagId: event.payload.tagId,
-            });
-            if (Option.isNone(existingRow)) {
-              return;
-            }
-            yield* projectionTagRepository.upsert({
-              ...existingRow.value,
-              name: event.payload.name,
-              nameNormalized: normalizeTagNameForDedup(event.payload.name),
-              updatedAt: event.payload.updatedAt,
-            });
-            return;
-          }
-
-          case "tag.deleted":
-            yield* projectionTagRepository.deleteById({
-              tagId: event.payload.tagId,
-            });
-            return;
-
-          default:
-            return;
-        }
-      },
-    );
 
     const refreshThreadShellSummary = Effect.fn("refreshThreadShellSummary")(function* (
       threadId: ThreadId,
@@ -1811,10 +1763,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         name: ORCHESTRATION_PROJECTOR_NAMES.threads,
         apply: applyThreadsProjection,
       },
-      {
-        name: ORCHESTRATION_PROJECTOR_NAMES.tags,
-        apply: applyTagsProjection,
-      },
     ];
 
     const applyAttachmentSideEffects = Effect.fn("applyAttachmentSideEffects")(
@@ -1984,5 +1932,4 @@ export const OrchestrationProjectionPipelineLive = Layer.effect(
   Layer.provideMerge(ProjectionTurnRepositoryLive),
   Layer.provideMerge(ProjectionPendingApprovalRepositoryLive),
   Layer.provideMerge(ProjectionStateRepositoryLive),
-  Layer.provideMerge(ProjectionTagRepositoryLive),
 );

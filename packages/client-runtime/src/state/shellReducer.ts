@@ -40,18 +40,6 @@ export function applyShellStreamEvent(
         threads: Arr.filter(snapshot.threads, (t) => t.id !== event.threadId),
         snapshotSequence: event.sequence,
       };
-    case "tag-upserted": {
-      const tags = snapshot.tags.some((tag) => tag.id === event.tag.id)
-        ? Arr.map(snapshot.tags, (tag) => (tag.id === event.tag.id ? event.tag : tag))
-        : Arr.append(snapshot.tags, event.tag);
-      return { ...snapshot, tags, snapshotSequence: event.sequence };
-    }
-    case "tag-removed":
-      return {
-        ...snapshot,
-        tags: Arr.filter(snapshot.tags, (tag) => tag.id !== event.tagId),
-        snapshotSequence: event.sequence,
-      };
     default:
       return snapshot;
   }

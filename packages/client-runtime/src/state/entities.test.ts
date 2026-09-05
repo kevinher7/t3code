@@ -108,7 +108,6 @@ const THREAD_SHELL = {
 const SNAPSHOT: OrchestrationShellSnapshot = {
   snapshotSequence: 1,
   updatedAt: "2026-06-01T00:00:00.000Z",
-  tags: [],
   projects: [
     {
       id: PROJECT_ID,
@@ -117,7 +116,6 @@ const SNAPSHOT: OrchestrationShellSnapshot = {
       repositoryIdentity: null,
       defaultModelSelection: null,
       scripts: [],
-      tags: [],
       createdAt: "2026-06-01T00:00:00.000Z",
       updatedAt: "2026-06-01T00:00:00.000Z",
     },
@@ -128,7 +126,6 @@ const SNAPSHOT: OrchestrationShellSnapshot = {
       repositoryIdentity: null,
       defaultModelSelection: null,
       scripts: [],
-      tags: [],
       createdAt: "2026-06-01T00:00:00.000Z",
       updatedAt: "2026-06-01T00:00:00.000Z",
     },

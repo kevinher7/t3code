@@ -144,7 +144,6 @@ export function buildPrContentPrompt(input: PrContentPromptInput) {
 export interface BranchNamePromptInput {
   message: string;
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
-  username?: string | undefined;
   policy?: TextGenerationPolicy | undefined;
 }
 
@@ -184,15 +183,13 @@ function buildPromptFromMessage(input: PromptFromMessageInput): string {
 }
 
 export function buildBranchNamePrompt(input: BranchNamePromptInput) {
-  const userSegment = input.username ? `/${input.username}` : "";
   const prompt = buildPromptFromMessage({
     instruction: "You generate concise git branch names.",
     responseShape: "Return a JSON object with key: branch.",
     rules: [
-      "Branch must start with a type prefix: feature, fix, chore, docs, refactor, or test.",
-      `Format: <type>${userSegment}/<slug>`,
-      "Slug should describe the requested work in 2-5 words.",
-      "Use plain lowercase words only, no issue numbers, no punctuation beyond hyphens and slashes.",
+      "Branch should describe the requested work from the user message.",
+      "Keep it short and specific (2-6 words).",
+      "Use plain words only, no issue prefixes and no punctuation-heavy text.",
       "If images are attached, use them as primary context for visual/UI issues.",
     ],
     message: input.message,

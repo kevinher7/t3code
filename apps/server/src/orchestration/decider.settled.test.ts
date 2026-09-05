@@ -64,7 +64,6 @@ function makeReadModel(
         session,
       },
     ],
-    tags: [],
     updatedAt: NOW,
   };
 }

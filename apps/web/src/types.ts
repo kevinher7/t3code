@@ -14,7 +14,6 @@ import type {
 } from "@t3tools/contracts";
 import type {
   EnvironmentProject,
-  EnvironmentTag,
   EnvironmentThread,
   EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
@@ -78,7 +77,6 @@ export type TurnDiffSummary = OrchestrationCheckpointSummary;
 export type Project = EnvironmentProject;
 export type Thread = EnvironmentThread;
 export type ThreadShell = EnvironmentThreadShell;
-export type Tag = EnvironmentTag;
 
 export interface ThreadTurnState {
   latestTurn: OrchestrationLatestTurn | null;
