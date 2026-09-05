@@ -77,7 +77,6 @@ function makeReadModel(
   return {
     snapshotSequence: 0,
     updatedAt: now,
-    tags: [],
     projects: [
       {
         id: projectId,
@@ -85,7 +84,6 @@ function makeReadModel(
         workspaceRoot: "/tmp/provider-reaper-project",
         defaultModelSelection,
         scripts: [],
-        tags: [],
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
@@ -225,8 +223,6 @@ describe("ProviderSessionReaper", () => {
                 : Option.none(),
             ),
           getThreadDetailById: () => Effect.die("unused"),
-          listAllTags: () => Effect.succeed([]),
-          getTagById: () => Effect.succeed(Option.none()),
           getThreadDetailSnapshot: () => Effect.die("unused"),
           searchThreads: () => Effect.succeed({ matches: [] }),
         }),

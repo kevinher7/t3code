@@ -52,7 +52,6 @@ function project(input: {
       : {}),
     defaultModelSelection: null,
     scripts: [],
-    tags: [],
     createdAt: "2026-07-01T00:00:00Z",
     updatedAt: "2026-07-01T00:00:00Z",
   };
@@ -168,7 +167,6 @@ function makeService(input: {
             Effect.succeed({
               snapshotSequence: 1,
               projects: input.projects,
-              tags: [],
               threads: [],
               updatedAt: "2026-07-01T00:00:00Z",
             }),

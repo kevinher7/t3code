@@ -14,7 +14,6 @@ import {
   type ServerProvider,
   type ResolvedKeybindingsConfig,
   type ScopedThreadRef,
-  type TagId,
   type ThreadId,
   type TurnId,
   type KeybindingCommand,
@@ -135,7 +134,6 @@ import {
   isImageAttachment,
   videoMimeType,
   type SessionPhase,
-  type Tag,
   type Thread,
   type TurnDiffSummary,
 } from "../types";
@@ -143,8 +141,6 @@ import { useTheme } from "../hooks/useTheme";
 import { writeTextToClipboard } from "../hooks/useCopyToClipboard";
 import { useTurnDiffSummaries } from "../hooks/useTurnDiffSummaries";
 import { isCommandPaletteOpen } from "../commandPaletteBus";
-import { useTagCreateDialogStore } from "../tagCreateDialogStore";
-import { toggleProjectTagAssignment } from "./Sidebar.logic";
 import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY } from "../rightPanelLayout";
@@ -286,7 +282,6 @@ import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
 import {
   useProject,
   useProjects,
-  useTags,
   useThread,
   useThreadRefs,
   useThreadShell,
@@ -3537,43 +3532,6 @@ function ChatViewContent(props: ChatViewProps) {
     },
     [activeProject, persistProjectScripts],
   );
-
-  const allTags = useTags();
-  const availableTags = useMemo<readonly Tag[]>(
-    () =>
-      activeProject
-        ? allTags.filter((tag) => tag.environmentId === activeProject.environmentId)
-        : [],
-    [allTags, activeProject],
-  );
-  const handleToggleProjectTag = useCallback(
-    async (tagId: TagId, _nextChecked: boolean) => {
-      if (!activeProject) return;
-      const nextTagIds = toggleProjectTagAssignment(activeProject.tags, tagId);
-      const result = await updateProject({
-        environmentId: activeProject.environmentId,
-        input: {
-          projectId: activeProject.id,
-          tags: nextTagIds,
-        },
-      });
-      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: `Failed to update tags for "${activeProject.title}"`,
-            description: error instanceof Error ? error.message : "An error occurred.",
-          }),
-        );
-      }
-    },
-    [activeProject, updateProject],
-  );
-  const openTagCreateDialog = useTagCreateDialogStore((s) => s.open);
-  const handleCreateProjectTag = useCallback(() => {
-    openTagCreateDialog();
-  }, [openTagCreateDialog]);
 
   const handleRuntimeModeChange = useCallback(
     (mode: RuntimeMode) => {
@@ -7231,8 +7189,6 @@ function ChatViewContent(props: ChatViewProps) {
             preferredScriptId={
               activeProject ? (lastInvokedScriptByProjectId[activeProject.id] ?? null) : null
             }
-            activeProjectTags={activeProject?.tags}
-            availableTags={availableTags}
             keybindings={keybindings}
             availableEditors={availableEditors}
             rightPanelOpen={rightPanelOpen}
@@ -7242,8 +7198,6 @@ function ChatViewContent(props: ChatViewProps) {
             onAddProjectScript={saveProjectScript}
             onUpdateProjectScript={updateProjectScript}
             onDeleteProjectScript={deleteProjectScript}
-            onToggleProjectTag={handleToggleProjectTag}
-            onCreateProjectTag={handleCreateProjectTag}
           />
         </WorkspacePageHeader>
 

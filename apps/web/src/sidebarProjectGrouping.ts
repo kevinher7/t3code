@@ -1,4 +1,4 @@
-import type { EnvironmentId, ScopedProjectRef, TagId } from "@t3tools/contracts";
+import type { EnvironmentId, ScopedProjectRef } from "@t3tools/contracts";
 import { buildProjectGroups, type ProjectGroupingSettings } from "./logicalProject";
 import type { Project } from "./types";
 
@@ -23,7 +23,6 @@ export interface SidebarProjectSnapshot extends Project {
   memberProjects: readonly SidebarProjectGroupMember[];
   memberProjectRefs: readonly ScopedProjectRef[];
   remoteEnvironmentLabels: readonly string[];
-  displayTagIds: readonly TagId[];
 }
 
 export interface SidebarProjectPickerEntry {
@@ -100,8 +99,6 @@ export function buildSidebarProjectSnapshots(input: {
       remoteMembers.length > 0 &&
       remoteMembers.every((member) => isDesktopLocal(member.environmentId));
 
-    const displayTagIds = Array.from(new Set(members.flatMap((member) => member.tags))) as TagId[];
-
     return {
       ...representative,
       projectKey: group.key,
@@ -113,7 +110,6 @@ export function buildSidebarProjectSnapshots(input: {
       memberProjects: members,
       memberProjectRefs: group.memberProjectRefs,
       remoteEnvironmentLabels,
-      displayTagIds,
     };
   });
 }

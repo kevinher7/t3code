@@ -245,7 +245,6 @@ const makeDefaultOrchestrationReadModel = () => {
   return {
     snapshotSequence: 0,
     updatedAt: now,
-    tags: [],
     projects: [
       {
         id: defaultProjectId,
@@ -253,7 +252,6 @@ const makeDefaultOrchestrationReadModel = () => {
         workspaceRoot: "/tmp/default-project",
         defaultModelSelection,
         scripts: [],
-        tags: [],
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
@@ -477,9 +475,7 @@ const buildAppUnderTest = (options?: {
 }) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
-    const tempBaseDir = yield* fileSystem.makeTempDirectoryScoped({
-      prefix: "t3-router-test-",
-    });
+    const tempBaseDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-router-test-" });
     const baseDir = options?.config?.baseDir ?? tempBaseDir;
     const devUrl = options?.config?.devUrl;
     const derivedPaths = yield* ServerConfig.deriveServerPaths(baseDir, devUrl);
@@ -864,7 +860,6 @@ const buildAppUnderTest = (options?: {
               snapshotSequence: 0,
               projects: [],
               threads: [],
-              tags: [],
               updatedAt: "1970-01-01T00:00:00.000Z",
             }),
           getArchivedShellSnapshot: () =>
@@ -872,7 +867,6 @@ const buildAppUnderTest = (options?: {
               snapshotSequence: 0,
               projects: [],
               threads: [],
-              tags: [],
               updatedAt: "1970-01-01T00:00:00.000Z",
             }),
           searchThreads: () => Effect.succeed({ matches: [] }),
@@ -890,8 +884,6 @@ const buildAppUnderTest = (options?: {
           getActiveProjectByWorkspaceRoot: () => Effect.succeed(Option.none()),
           getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
           getThreadCheckpointContext: () => Effect.succeed(Option.none()),
-          listAllTags: () => Effect.succeed([]),
-          getTagById: () => Effect.succeed(Option.none()),
           ...options?.layers?.projectionSnapshotQuery,
         }),
       ),
@@ -1538,9 +1530,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const staticDir = yield* fileSystem.makeTempDirectoryScoped({
-        prefix: "t3-router-static-",
-      });
+      const staticDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-router-static-" });
       const indexPath = path.join(staticDir, "index.html");
       yield* fileSystem.writeFileString(indexPath, "<html>router-static-ok</html>");
 
@@ -4954,9 +4944,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const workspaceDir = yield* fs.makeTempDirectoryScoped({
-        prefix: "t3-ws-auth-required-",
-      });
+      const workspaceDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-ws-auth-required-" });
       yield* fs.writeFileString(
         path.join(workspaceDir, "needle-file.ts"),
         "export const needle = 1;",
@@ -5273,10 +5261,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           version: 1 as const,
           sequence: 2,
           type: "ready" as const,
-          payload: {
-            at: "2026-01-01T00:00:00.000Z",
-            environment: testEnvironmentDescriptor,
-          },
+          payload: { at: "2026-01-01T00:00:00.000Z", environment: testEnvironmentDescriptor },
         });
 
         yield* buildAppUnderTest({
@@ -5310,9 +5295,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const workspaceDir = yield* fs.makeTempDirectoryScoped({
-        prefix: "t3-ws-project-search-",
-      });
+      const workspaceDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-ws-project-search-" });
       yield* fs.writeFileString(
         path.join(workspaceDir, "needle-file.ts"),
         "export const needle = 1;",
@@ -5381,16 +5364,12 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         prefix: "t3-ws-project-search-gitignored-",
       });
       yield* fs.writeFileString(path.join(workspaceDir, ".gitignore"), ".venv/\n");
-      yield* fs.makeDirectory(path.join(workspaceDir, ".venv", "lib"), {
-        recursive: true,
-      });
+      yield* fs.makeDirectory(path.join(workspaceDir, ".venv", "lib"), { recursive: true });
       yield* fs.writeFileString(
         path.join(workspaceDir, ".venv", "lib", "ignored-search-target.ts"),
         "export const ignored = true;",
       );
-      yield* fs.makeDirectory(path.join(workspaceDir, "src"), {
-        recursive: true,
-      });
+      yield* fs.makeDirectory(path.join(workspaceDir, "src"), { recursive: true });
       yield* fs.writeFileString(
         path.join(workspaceDir, "src", "tracked.ts"),
         "export const ok = 1;",
@@ -5582,9 +5561,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const workspaceDir = yield* fs.makeTempDirectoryScoped({
-        prefix: "t3-ws-project-write-",
-      });
+      const workspaceDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-ws-project-write-" });
 
       yield* buildAppUnderTest();
 
@@ -5609,9 +5586,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const parentDir = yield* fs.makeTempDirectoryScoped({
-        prefix: "t3-ws-project-create-",
-      });
+      const parentDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-ws-project-create-" });
       const missingWorkspaceRoot = path.join(parentDir, "nested", "new-project");
 
       yield* buildAppUnderTest();
@@ -5868,9 +5843,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
   it.effect("routes websocket rpc projects.writeFile errors", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const workspaceDir = yield* fs.makeTempDirectoryScoped({
-        prefix: "t3-ws-project-write-",
-      });
+      const workspaceDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-ws-project-write-" });
 
       yield* buildAppUnderTest();
 
@@ -6658,7 +6631,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       const snapshot = {
         snapshotSequence: 1,
         updatedAt: now,
-        tags: [],
         projects: [
           {
             id: ProjectId.make("project-a"),
@@ -6666,7 +6638,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             workspaceRoot: "/tmp/project-a",
             defaultModelSelection,
             scripts: [],
-            tags: [],
             createdAt: now,
             updatedAt: now,
             deletedAt: null,
@@ -6903,7 +6874,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                   snapshotSequence: 1,
                   projects: [],
                   threads: [makeDefaultOrchestrationThreadShell()],
-                  tags: [],
                   updatedAt: "2026-01-01T00:00:00.000Z",
                 };
               }),
@@ -7362,7 +7332,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                 snapshotSequence: 100_000,
                 projects: [],
                 threads: [makeDefaultOrchestrationThreadShell({ id: snapshotThreadId })],
-                tags: [],
                 updatedAt: now,
               }),
           },
@@ -7420,7 +7389,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                 snapshotSequence: 5,
                 projects: [],
                 threads: [shell],
-                tags: [],
                 updatedAt: "2026-01-01T00:00:00.000Z",
               }),
           },
@@ -7475,7 +7443,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                 snapshotSequence: 5,
                 projects: [],
                 threads: [],
-                tags: [],
                 updatedAt: "2026-01-01T00:00:00.000Z",
               }),
           },
@@ -8035,12 +8002,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           projectionSnapshotQuery: {
             getThreadShellById: () =>
               Effect.succeed(
-                Option.some(
-                  makeDefaultOrchestrationThreadShell({
-                    id: threadId,
-                    session: null,
-                  }),
-                ),
+                Option.some(makeDefaultOrchestrationThreadShell({ id: threadId, session: null })),
               ),
           },
         },

@@ -31,9 +31,6 @@ type CommandInput<T extends CommandType> = Omit<
 export type CreateProjectInput = CommandInput<"project.create">;
 export type UpdateProjectInput = CommandInput<"project.meta.update">;
 export type DeleteProjectInput = CommandInput<"project.delete">;
-export type CreateTagInput = CommandInput<"tag.create">;
-export type RenameTagInput = CommandInput<"tag.rename">;
-export type DeleteTagInput = CommandInput<"tag.delete">;
 export type CreateThreadInput = CommandInput<"thread.create">;
 export type DeleteThreadInput = CommandInput<"thread.delete">;
 export type ArchiveThreadInput = CommandInput<"thread.archive">;
@@ -117,38 +114,6 @@ export const deleteProject: (input: DeleteProjectInput) => CommandEffect = Effec
   return yield* dispatch({
     ...input,
     type: "project.delete",
-    commandId: yield* commandId(input),
-  });
-});
-
-export const createTag: (input: CreateTagInput) => CommandEffect = Effect.fn(
-  "EnvironmentCommands.createTag",
-)(function* (input) {
-  const metadata = yield* timestampedCommandMetadata(input);
-  return yield* dispatch({
-    ...input,
-    type: "tag.create",
-    commandId: metadata.commandId,
-    createdAt: metadata.createdAt,
-  });
-});
-
-export const renameTag: (input: RenameTagInput) => CommandEffect = Effect.fn(
-  "EnvironmentCommands.renameTag",
-)(function* (input) {
-  return yield* dispatch({
-    ...input,
-    type: "tag.rename",
-    commandId: yield* commandId(input),
-  });
-});
-
-export const deleteTag: (input: DeleteTagInput) => CommandEffect = Effect.fn(
-  "EnvironmentCommands.deleteTag",
-)(function* (input) {
-  return yield* dispatch({
-    ...input,
-    type: "tag.delete",
     commandId: yield* commandId(input),
   });
 });

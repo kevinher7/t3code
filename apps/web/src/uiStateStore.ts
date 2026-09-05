@@ -1,4 +1,3 @@
-import type { TagId } from "@t3tools/contracts";
 import { Debouncer } from "@tanstack/react-pacer";
 import { create } from "zustand";
 import { normalizeProjectPathForComparison } from "./lib/projectPaths";
@@ -28,7 +27,6 @@ export interface PersistedUiState {
   defaultAdvertisedEndpointKey?: string | null;
   threadChangedFilesExpansionVersion?: typeof THREAD_CHANGED_FILES_EXPANSION_VERSION;
   threadChangedFilesExpandedById?: Record<string, Record<string, boolean>>;
-  projectTagFilterSelectedTagIds?: string[];
 }
 
 export interface UiProjectState {
@@ -45,9 +43,7 @@ export interface UiEndpointState {
   defaultAdvertisedEndpointKey: string | null;
 }
 
-export interface UiState extends UiProjectState, UiThreadState, UiEndpointState {
-  projectTagFilter: { selectedTagIds: TagId[] };
-}
+export interface UiState extends UiProjectState, UiThreadState, UiEndpointState {}
 
 const initialState: UiState = {
   projectExpandedById: {},
@@ -55,7 +51,6 @@ const initialState: UiState = {
   threadLastVisitedAtById: {},
   threadChangedFilesExpandedById: {},
   defaultAdvertisedEndpointKey: null,
-  projectTagFilter: { selectedTagIds: [] },
 };
 
 const LEGACY_PROJECT_CWD_PREFERENCE_PREFIX = "legacy-project-cwd:";
@@ -140,11 +135,6 @@ export function parsePersistedState(parsed: PersistedUiState): UiState {
       parsed.defaultAdvertisedEndpointKey.length > 0
         ? parsed.defaultAdvertisedEndpointKey
         : null,
-    projectTagFilter: {
-      selectedTagIds: (parsed.projectTagFilterSelectedTagIds ?? [])
-        .filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
-        .map((entry) => entry as TagId),
-    },
   };
 }
 
@@ -217,7 +207,6 @@ export function persistState(state: UiState): void {
         defaultAdvertisedEndpointKey: state.defaultAdvertisedEndpointKey,
         threadChangedFilesExpansionVersion: THREAD_CHANGED_FILES_EXPANSION_VERSION,
         threadChangedFilesExpandedById: state.threadChangedFilesExpandedById,
-        projectTagFilterSelectedTagIds: state.projectTagFilter.selectedTagIds.map((tagId) => tagId),
       } satisfies PersistedUiState),
     );
     if (!legacyKeysCleanedUp) {
@@ -392,34 +381,6 @@ export function reorderProjects(
   };
 }
 
-export function setProjectTagFilterSelection(
-  state: UiState,
-  selectedTagIds: readonly TagId[],
-): UiState {
-  if (
-    state.projectTagFilter.selectedTagIds.length === selectedTagIds.length &&
-    state.projectTagFilter.selectedTagIds.every((id, index) => id === selectedTagIds[index])
-  ) {
-    return state;
-  }
-  return {
-    ...state,
-    projectTagFilter: { selectedTagIds: [...selectedTagIds] },
-  };
-}
-
-export function clearProjectTagFilterTagId(state: UiState, tagId: TagId): UiState {
-  if (!state.projectTagFilter.selectedTagIds.includes(tagId)) {
-    return state;
-  }
-  return {
-    ...state,
-    projectTagFilter: {
-      selectedTagIds: state.projectTagFilter.selectedTagIds.filter((id) => id !== tagId),
-    },
-  };
-}
-
 interface UiStateStore extends UiState {
   markThreadVisited: (threadId: string, visitedAt: string) => void;
   markThreadUnread: (threadId: string, latestTurnCompletedAt: string | null | undefined) => void;
@@ -431,8 +392,6 @@ interface UiStateStore extends UiState {
     draggedProjectIds: readonly string[],
     targetProjectIds: readonly string[],
   ) => void;
-  setProjectTagFilterSelection: (selectedTagIds: readonly TagId[]) => void;
-  clearProjectTagFilterTagId: (tagId: TagId) => void;
 }
 
 export const useUiStateStore = create<UiStateStore>((set) => ({
@@ -451,9 +410,6 @@ export const useUiStateStore = create<UiStateStore>((set) => ({
     set((state) =>
       reorderProjects(state, currentProjectOrder, draggedProjectIds, targetProjectIds),
     ),
-  setProjectTagFilterSelection: (selectedTagIds) =>
-    set((state) => setProjectTagFilterSelection(state, selectedTagIds)),
-  clearProjectTagFilterTagId: (tagId) => set((state) => clearProjectTagFilterTagId(state, tagId)),
 }));
 
 useUiStateStore.subscribe((state) => debouncedPersistState.maybeExecute(state));

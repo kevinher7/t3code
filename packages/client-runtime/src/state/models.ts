@@ -2,16 +2,11 @@ import type {
   EnvironmentId,
   OrchestrationMessage,
   OrchestrationProjectShell,
-  OrchestrationTagCatalogEntry,
   OrchestrationThread,
   OrchestrationThreadShell,
 } from "@t3tools/contracts";
 
 export interface EnvironmentProject extends OrchestrationProjectShell {
-  readonly environmentId: EnvironmentId;
-}
-
-export interface EnvironmentTag extends OrchestrationTagCatalogEntry {
   readonly environmentId: EnvironmentId;
 }
 
@@ -30,13 +25,6 @@ export function scopeProject(
   project: OrchestrationProjectShell,
 ): EnvironmentProject {
   return { ...project, environmentId };
-}
-
-export function scopeTag(
-  environmentId: EnvironmentId,
-  tag: OrchestrationTagCatalogEntry,
-): EnvironmentTag {
-  return { ...tag, environmentId };
 }
 
 export function scopeThreadShell(

@@ -15,13 +15,11 @@ import type {
   OrchestrationSearchThreadsInput,
   OrchestrationSearchThreadsResult,
   OrchestrationShellSnapshot,
-  OrchestrationTagCatalogEntry,
   OrchestrationThread,
   OrchestrationThreadDetailSnapshot,
   OrchestrationThreadDetailWindow,
   OrchestrationThreadShell,
   ProjectId,
-  TagId,
   ThreadId,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
@@ -215,21 +213,6 @@ export interface ProjectionSnapshotQueryShape {
     threadId: ThreadId,
     window?: OrchestrationThreadDetailWindow,
   ) => Effect.Effect<Option.Option<OrchestrationThreadDetailSnapshot>, ProjectionRepositoryError>;
-
-  /**
-   * List all tag catalog entries.
-   */
-  readonly listAllTags: () => Effect.Effect<
-    ReadonlyArray<OrchestrationTagCatalogEntry>,
-    ProjectionRepositoryError
-  >;
-
-  /**
-   * Read a single tag catalog entry by id.
-   */
-  readonly getTagById: (
-    tagId: TagId,
-  ) => Effect.Effect<Option.Option<OrchestrationTagCatalogEntry>, ProjectionRepositoryError>;
 }
 
 /**

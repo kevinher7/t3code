@@ -57,7 +57,6 @@ function makeProject(
     workspaceRoot,
     defaultModelSelection: null,
     scripts: [],
-    tags: [],
     createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: NOW,
   };
@@ -102,7 +101,6 @@ function makeSnapshot(
     snapshotSequence: 1,
     projects,
     threads,
-    tags: [],
     updatedAt: NOW,
   };
 }

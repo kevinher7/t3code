@@ -3,7 +3,6 @@ import {
   type EditorId,
   type ProjectScript,
   type ResolvedKeybindingsConfig,
-  type TagId,
   type ThreadId,
 } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
@@ -31,8 +30,6 @@ import ProjectScriptsControl, {
   type NewProjectScriptInput,
   type ProjectScriptActionResult,
 } from "../ProjectScriptsControl";
-import ProjectTagsControl from "../ProjectTagsControl";
-import type { Tag } from "../../types";
 import { OpenInPicker } from "./OpenInPicker";
 import { useRemoteOpenState, type RemoteOpenMode } from "../../remoteOpen";
 import { usePrimaryEnvironmentId } from "../../state/environments";
@@ -61,8 +58,6 @@ interface ChatHeaderProps {
   openInCwd: string | null;
   activeProjectScripts: ReadonlyArray<ProjectScript> | undefined;
   preferredScriptId: string | null;
-  activeProjectTags: readonly TagId[] | undefined;
-  availableTags: readonly Tag[];
   keybindings: ResolvedKeybindingsConfig;
   availableEditors: ReadonlyArray<EditorId>;
   rightPanelOpen: boolean;
@@ -76,8 +71,6 @@ interface ChatHeaderProps {
     input: NewProjectScriptInput,
   ) => Promise<ProjectScriptActionResult>;
   onDeleteProjectScript: (scriptId: string) => Promise<ProjectScriptActionResult>;
-  onToggleProjectTag: (tagId: TagId, nextChecked: boolean) => void | Promise<void>;
-  onCreateProjectTag: () => void;
 }
 
 /**
@@ -133,8 +126,6 @@ export const ChatHeader = memo(function ChatHeader({
   openInCwd,
   activeProjectScripts,
   preferredScriptId,
-  activeProjectTags,
-  availableTags,
   keybindings,
   availableEditors,
   rightPanelOpen,
@@ -145,8 +136,6 @@ export const ChatHeader = memo(function ChatHeader({
   onAddProjectScript,
   onUpdateProjectScript,
   onDeleteProjectScript,
-  onToggleProjectTag,
-  onCreateProjectTag,
 }: ChatHeaderProps) {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const fileScripts = useT3ProjectFileScripts(
@@ -389,14 +378,6 @@ export const ChatHeader = memo(function ChatHeader({
           rightPanelOpen ? "pr-0" : "pr-16",
         )}
       >
-        {activeProjectTags !== undefined && (
-          <ProjectTagsControl
-            assignedTagIds={activeProjectTags}
-            availableTags={availableTags}
-            onToggleTag={onToggleProjectTag}
-            onCreateTag={onCreateProjectTag}
-          />
-        )}
         {activeProjectScripts && (
           <ProjectScriptsControl
             scripts={activeProjectScripts}

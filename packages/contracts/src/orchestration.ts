@@ -17,7 +17,6 @@ import {
   PositiveInt,
   ProjectId,
   ProviderItemId,
-  TagId,
   ThreadId,
   TrimmedNonEmptyString,
   TrimmedString,
@@ -184,14 +183,6 @@ const ChatAttachmentId = TrimmedNonEmptyString.check(
 );
 export type ChatAttachmentId = typeof ChatAttachmentId.Type;
 
-export const TAG_NAME_MAX_CHARS = 64;
-export const TAG_NAME_PATTERN: RegExp = /^[\p{L}\p{N} _-]+$/u;
-const TagName = TrimmedNonEmptyString.check(
-  Schema.isMaxLength(TAG_NAME_MAX_CHARS),
-  Schema.isPattern(TAG_NAME_PATTERN),
-);
-export type TagName = typeof TagName.Type;
-
 export const ChatImageAttachment = Schema.Struct({
   type: Schema.Literal("image"),
   id: ChatAttachmentId,
@@ -285,14 +276,6 @@ export const ProjectScript = Schema.Struct({
 });
 export type ProjectScript = typeof ProjectScript.Type;
 
-export const OrchestrationTagCatalogEntry = Schema.Struct({
-  id: TagId,
-  name: TagName,
-  createdAt: IsoDateTime,
-  updatedAt: IsoDateTime,
-});
-export type OrchestrationTagCatalogEntry = typeof OrchestrationTagCatalogEntry.Type;
-
 export const ProjectFaviconPath = TrimmedNonEmptyString.check(
   Schema.isMaxLength(1024),
   Schema.isPattern(/\.(?:avif|gif|ico|jpe?g|png|svg|webp)$/i),
@@ -311,7 +294,6 @@ export const OrchestrationProject = Schema.Struct({
   // Optional on the wire so cached snapshots from older servers still decode.
   faviconPath: Schema.optional(Schema.NullOr(ProjectFaviconPath)),
   scripts: Schema.Array(ProjectScript),
-  tags: Schema.Array(TagId).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
   deletedAt: Schema.NullOr(IsoDateTime),
@@ -509,9 +491,6 @@ export const OrchestrationReadModel = Schema.Struct({
   snapshotSequence: NonNegativeInt,
   projects: Schema.Array(OrchestrationProject),
   threads: Schema.Array(OrchestrationThread),
-  tags: Schema.Array(OrchestrationTagCatalogEntry).pipe(
-    Schema.withDecodingDefault(Effect.succeed([])),
-  ),
   updatedAt: IsoDateTime,
 });
 export type OrchestrationReadModel = typeof OrchestrationReadModel.Type;
@@ -526,7 +505,6 @@ export const OrchestrationProjectShell = Schema.Struct({
   // Optional on the wire so cached snapshots from older servers still decode.
   faviconPath: Schema.optional(Schema.NullOr(ProjectFaviconPath)),
   scripts: Schema.Array(ProjectScript),
-  tags: Schema.Array(TagId).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -591,9 +569,6 @@ export const OrchestrationShellSnapshot = Schema.Struct({
   snapshotSequence: NonNegativeInt,
   projects: Schema.Array(OrchestrationProjectShell),
   threads: Schema.Array(OrchestrationThreadShell),
-  tags: Schema.Array(OrchestrationTagCatalogEntry).pipe(
-    Schema.withDecodingDefault(Effect.succeed([])),
-  ),
   updatedAt: IsoDateTime,
 });
 export type OrchestrationShellSnapshot = typeof OrchestrationShellSnapshot.Type;
@@ -618,16 +593,6 @@ export const OrchestrationShellStreamEvent = Schema.Union([
     kind: Schema.Literal("thread-removed"),
     sequence: NonNegativeInt,
     threadId: ThreadId,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("tag-upserted"),
-    sequence: NonNegativeInt,
-    tag: OrchestrationTagCatalogEntry,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("tag-removed"),
-    sequence: NonNegativeInt,
-    tagId: TagId,
   }),
 ]);
 export type OrchestrationShellStreamEvent = typeof OrchestrationShellStreamEvent.Type;
@@ -758,7 +723,6 @@ const ProjectMetaUpdateCommand = Schema.Struct({
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
   faviconPath: Schema.optional(Schema.NullOr(ProjectFaviconPath)),
   scripts: Schema.optional(Schema.Array(ProjectScript)),
-  tags: Schema.optional(Schema.Array(TagId)),
 });
 
 const ProjectDeleteCommand = Schema.Struct({
@@ -766,30 +730,6 @@ const ProjectDeleteCommand = Schema.Struct({
   commandId: CommandId,
   projectId: ProjectId,
   force: Schema.optional(Schema.Boolean),
-});
-
-const TagCreateCommand = Schema.Struct({
-  type: Schema.Literal("tag.create"),
-  commandId: CommandId,
-  tagId: TagId,
-  // Server normalizes; we deliberately do NOT use TagName here so client errors
-  // surface as invariant errors with a clear message rather than schema-decode
-  // failures at the WS boundary.
-  name: TrimmedNonEmptyString,
-  createdAt: IsoDateTime,
-});
-
-const TagRenameCommand = Schema.Struct({
-  type: Schema.Literal("tag.rename"),
-  commandId: CommandId,
-  tagId: TagId,
-  name: TrimmedNonEmptyString,
-});
-
-const TagDeleteCommand = Schema.Struct({
-  type: Schema.Literal("tag.delete"),
-  commandId: CommandId,
-  tagId: TagId,
 });
 
 const ThreadCreateCommand = Schema.Struct({
@@ -1069,9 +1009,6 @@ const DispatchableClientOrchestrationCommand = Schema.Union([
   ThreadUserInputRespondCommand,
   ThreadCheckpointRevertCommand,
   ThreadSessionStopCommand,
-  TagCreateCommand,
-  TagRenameCommand,
-  TagDeleteCommand,
 ]);
 export type DispatchableClientOrchestrationCommand =
   typeof DispatchableClientOrchestrationCommand.Type;
@@ -1100,9 +1037,6 @@ export const ClientOrchestrationCommand = Schema.Union([
   ThreadUserInputRespondCommand,
   ThreadCheckpointRevertCommand,
   ThreadSessionStopCommand,
-  TagCreateCommand,
-  TagRenameCommand,
-  TagDeleteCommand,
 ]);
 export type ClientOrchestrationCommand = typeof ClientOrchestrationCommand.Type;
 
@@ -1228,13 +1162,10 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.proposed-plan-upserted",
   "thread.turn-diff-completed",
   "thread.activity-appended",
-  "tag.created",
-  "tag.renamed",
-  "tag.deleted",
 ]);
 export type OrchestrationEventType = typeof OrchestrationEventType.Type;
 
-export const OrchestrationAggregateKind = Schema.Literals(["project", "thread", "tag"]);
+export const OrchestrationAggregateKind = Schema.Literals(["project", "thread"]);
 export type OrchestrationAggregateKind = typeof OrchestrationAggregateKind.Type;
 export const OrchestrationActorKind = Schema.Literals(["client", "server", "provider"]);
 
@@ -1247,7 +1178,6 @@ export const ProjectCreatedPayload = Schema.Struct({
   // Optional so persisted events from older servers still decode.
   faviconPath: Schema.optional(Schema.NullOr(ProjectFaviconPath)),
   scripts: Schema.Array(ProjectScript),
-  tags: Schema.Array(TagId).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -1261,7 +1191,6 @@ export const ProjectMetaUpdatedPayload = Schema.Struct({
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
   faviconPath: Schema.optional(Schema.NullOr(ProjectFaviconPath)),
   scripts: Schema.optional(Schema.Array(ProjectScript)),
-  tags: Schema.optional(Schema.Array(TagId)),
   updatedAt: IsoDateTime,
 });
 
@@ -1269,27 +1198,6 @@ export const ProjectDeletedPayload = Schema.Struct({
   projectId: ProjectId,
   deletedAt: IsoDateTime,
 });
-
-export const TagCreatedPayload = Schema.Struct({
-  tagId: TagId,
-  name: TagName,
-  createdAt: IsoDateTime,
-  updatedAt: IsoDateTime,
-});
-export type TagCreatedPayload = typeof TagCreatedPayload.Type;
-
-export const TagRenamedPayload = Schema.Struct({
-  tagId: TagId,
-  name: TagName,
-  updatedAt: IsoDateTime,
-});
-export type TagRenamedPayload = typeof TagRenamedPayload.Type;
-
-export const TagDeletedPayload = Schema.Struct({
-  tagId: TagId,
-  deletedAt: IsoDateTime,
-});
-export type TagDeletedPayload = typeof TagDeletedPayload.Type;
 
 export const ThreadCreatedPayload = Schema.Struct({
   threadId: ThreadId,
@@ -1515,7 +1423,7 @@ const EventBaseFields = {
   sequence: NonNegativeInt,
   eventId: EventId,
   aggregateKind: OrchestrationAggregateKind,
-  aggregateId: Schema.Union([ProjectId, ThreadId, TagId]),
+  aggregateId: Schema.Union([ProjectId, ThreadId]),
   occurredAt: IsoDateTime,
   commandId: Schema.NullOr(CommandId),
   causationEventId: Schema.NullOr(EventId),
@@ -1668,21 +1576,6 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.activity-appended"),
     payload: ThreadActivityAppendedPayload,
-  }),
-  Schema.Struct({
-    ...EventBaseFields,
-    type: Schema.Literal("tag.created"),
-    payload: TagCreatedPayload,
-  }),
-  Schema.Struct({
-    ...EventBaseFields,
-    type: Schema.Literal("tag.renamed"),
-    payload: TagRenamedPayload,
-  }),
-  Schema.Struct({
-    ...EventBaseFields,
-    type: Schema.Literal("tag.deleted"),
-    payload: TagDeletedPayload,
   }),
 ]);
 export type OrchestrationEvent = typeof OrchestrationEvent.Type;

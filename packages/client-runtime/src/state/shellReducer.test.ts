@@ -9,7 +9,6 @@ const baseSnapshot: OrchestrationShellSnapshot = {
   snapshotSequence: 0,
   projects: [],
   threads: [],
-  tags: [],
   updatedAt: "2026-04-01T00:00:00.000Z",
 };
 
@@ -20,7 +19,6 @@ const stubProject = {
   repositoryIdentity: null,
   defaultModelSelection: null,
   scripts: [],
-  tags: [],
   createdAt: "2026-04-01T00:00:00.000Z",
   updatedAt: "2026-04-01T00:00:00.000Z",
 } as const;

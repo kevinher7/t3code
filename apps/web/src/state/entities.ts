@@ -1,7 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import type {
   EnvironmentProject,
-  EnvironmentTag,
   EnvironmentThread,
   EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
@@ -14,7 +13,7 @@ import type { EnvironmentId } from "@t3tools/contracts";
 import { Atom } from "effect/unstable/reactivity";
 import { useMemo } from "react";
 import { appAtomRegistry } from "../rpc/atomRegistry";
-import { environmentProjects, environmentTags } from "./projects";
+import { environmentProjects } from "./projects";
 import { environmentServerConfigsAtom } from "./server";
 import { allEnvironmentShellsBootstrappedAtom } from "./shell";
 import { environmentThreadDetails, environmentThreadShells } from "./threads";
@@ -66,10 +65,6 @@ export function useEnvironmentThreadRefs(
 
 export function useProjects(): ReadonlyArray<EnvironmentProject> {
   return useAtomValue(environmentProjects.projectsAtom);
-}
-
-export function useTags(): ReadonlyArray<EnvironmentTag> {
-  return useAtomValue(environmentTags.tagsAtom);
 }
 
 export function useServerConfigs(): ReadonlyMap<EnvironmentId, ServerConfig> {
