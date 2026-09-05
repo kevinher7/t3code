@@ -12,7 +12,7 @@ import {
   type RuntimeMode,
   type TurnId,
 } from "@t3tools/contracts";
-import { isTemporaryWorktreeBranch, WORKTREE_BRANCH_PREFIX } from "@t3tools/shared/git";
+import { isTemporaryWorktreeBranch } from "@t3tools/shared/git";
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
@@ -32,6 +32,8 @@ import { increment, orchestrationEventsProcessedTotal } from "../../observabilit
 import { ProviderAdapterRequestError } from "../../provider/Errors.ts";
 import type { ProviderServiceError } from "../../provider/Errors.ts";
 import { TextGeneration } from "../../textGeneration/TextGeneration.ts";
+import type { TextGenerationPolicy } from "../../textGeneration/TextGenerationPolicy.ts";
+import { customTextGenerationPolicy } from "../../textGeneration/TextGenerationPresets.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { ProviderRegistry } from "../../provider/Services/ProviderRegistry.ts";
 import { OrchestrationEngineService } from "../Services/OrchestrationEngine.ts";
@@ -280,6 +282,17 @@ function stalePendingRequestDetail(
   requestId: string,
 ): string {
   return `Stale pending ${requestKind} request: ${requestId}. Provider callback state does not survive app restarts or recovered sessions. Restart the turn to continue.`;
+}
+
+function worktreeBranchPolicy(gitUserName: string | null): TextGenerationPolicy {
+  const owner = gitUserName?.trim().split(/\s+/)[0]?.toLowerCase();
+  const ownerSegment = owner ? `/${owner}` : "";
+  return customTextGenerationPolicy({
+    branchInstructions: [
+      "Start with a type prefix: feature, fix, chore, docs, refactor, or test.",
+      `Format: <type>${ownerSegment}/<slug>`,
+    ].join("\n"),
+  });
 }
 
 function buildGeneratedWorktreeBranchName(raw: string): string {
@@ -860,16 +873,15 @@ const make = Effect.gen(function* () {
               yield* providerRegistry.getProviders,
             );
 
-      const fullName = yield* git
+      const gitUserName = yield* git
         .readConfigValue(cwd, "user.name")
         .pipe(Effect.orElseSucceed(() => null));
-      const firstName = fullName ? fullName.trim().split(/\s+/)[0]!.toLowerCase() : undefined;
 
       const generated = yield* textGeneration.generateBranchName({
         cwd,
         message: input.messageText,
         ...(attachments.length > 0 ? { attachments } : {}),
-        username: firstName,
+        policy: worktreeBranchPolicy(gitUserName),
         modelSelection,
       });
       if (!generated) return;
