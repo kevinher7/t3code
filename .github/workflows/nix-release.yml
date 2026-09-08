@@ -170,6 +170,15 @@ jobs:
             --pattern 't3code-cli-*.tar.gz' \
             --pattern 'T3-Code-*-arm64.zip'
 
+      - name: Upload SHA256SUMS
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          (cd artifacts && sha256sum *) > SHA256SUMS
+          gh release upload "${GITHUB_REF_NAME}" SHA256SUMS \
+            --repo "${{ github.repository }}" \
+            --clobber
+
       - name: Compute hashes and write nix-hashes.json
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
