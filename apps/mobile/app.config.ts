@@ -175,7 +175,8 @@ const config: ExpoConfig = {
   slug: "t3-code",
   platforms: ["ios", "android"],
   scheme: repoEnv.T3CODE_MOBILE_SCHEME ?? variant.scheme,
-  version: repoEnv.T3CODE_MOBILE_VERSION ?? "1.1.1",
+  version: "1.1.1",
+  ...(repoEnv.T3CODE_MOBILE_VERSION ? { version: repoEnv.T3CODE_MOBILE_VERSION } : {}),
   runtimeVersion: {
     // Development manifests resolve on every launch, so avoid fingerprint's
     // expensive native-project calculation there. Preview and production stay
