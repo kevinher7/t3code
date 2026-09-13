@@ -4,6 +4,24 @@
 
 This document covers the unified release workflow for stable and nightly desktop releases.
 
+## Fork releases
+
+On `kevinher7/t3code`, pushing a `v*` tag runs `.github/workflows/nix-release.yml`.
+It publishes the desktop and CLI packages plus a signed Android APK, then uploads
+`SHA256SUMS` for all four artifacts and updates `nix-hashes.json` on `personal`.
+Manual dispatch builds without publishing a release.
+
+Android signing requires the repository secrets `ANDROID_KEYSTORE_BASE64` and
+`ANDROID_KEYSTORE_PASSWORD`. The keystore must contain the alias `t3code`. Keep a
+backup and reuse this key for every release so Android accepts app updates.
+The APK uses `com.kevinher7.t3code`, the release tag without `v` as its version,
+and the workflow run number as its Android version code. It installs alongside
+upstream T3 Code and disables upstream Expo OTA updates.
+
+For Android updates, add `https://github.com/kevinher7/t3code` in Obtainium and
+enable background updates in its settings. No Obtainium service or build
+integration is needed. Android may require confirmation to install an update.
+
 ## What the workflow does
 
 - Workflow: `.github/workflows/release.yml`
