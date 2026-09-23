@@ -1,4 +1,4 @@
-import { EDITORS, EditorId, EnvironmentId } from "@t3tools/contracts";
+import { EDITORS, EditorId, EnvironmentId, type ServerConfig } from "@t3tools/contracts";
 import { selectableEditorIds } from "@t3tools/shared/editors";
 import {
   mapAtomCommandResult,
@@ -68,6 +68,25 @@ export function resolveAndPersistPreferredEditor(
   const editor = fallbackEditor(selectableEditors);
   if (editor) setLocalStorageItem(LAST_EDITOR_KEY, editor, EditorId);
   return editor;
+}
+
+/**
+ * Editor ids an environment offers, including its custom editors. Prefer this
+ * over reading `availableEditors` directly: that field holds built-in editors
+ * only, so a stored `custom:*` preference looks unavailable to callers that
+ * skip the merge, and `resolveAndPersistPreferredEditor` then overwrites it
+ * with a built-in. Memoized because callers pass the result to effect and
+ * callback deps.
+ */
+export function useSelectableEditors(
+  config: ServerConfig | null | undefined,
+): ReadonlyArray<EditorId> {
+  const availableEditors = config?.availableEditors;
+  const customEditors = config?.settings.customEditors;
+  return useMemo(
+    () => selectableEditorIds(availableEditors ?? [], customEditors ?? []),
+    [availableEditors, customEditors],
+  );
 }
 
 export function useOpenInPreferredEditor(

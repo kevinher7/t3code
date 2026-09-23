@@ -25,7 +25,7 @@ import * as Schema from "effect/Schema";
 import * as DateTime from "effect/DateTime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCodeViewFileReveal } from "./diffs/useCodeViewFileReveal";
-import { useOpenInPreferredEditor } from "../editorPreferences";
+import { useOpenInPreferredEditor, useSelectableEditors } from "../editorPreferences";
 import { useFileContextMenuHandler } from "../fileContextMenu";
 import { type DraftId } from "../composerDraftStore";
 import { openDiffFilePrimaryAction } from "../diffFileActions";
@@ -172,9 +172,10 @@ export default function DiffPanel({
     serverEnvironment.configValueAtom(activeThread?.environmentId ?? null),
   );
   const onFileContextMenu = useFileContextMenuHandler(activeThread?.environmentId ?? null);
+  const selectableEditors = useSelectableEditors(serverConfig);
   const openInPreferredEditor = useOpenInPreferredEditor(
     activeThread?.environmentId ?? null,
-    serverConfig?.availableEditors ?? [],
+    selectableEditors,
   );
   const getDiffFileContents = useAtomCommand(reviewEnvironment.diffFileContents);
   const gitStatusQuery = useEnvironmentQuery(

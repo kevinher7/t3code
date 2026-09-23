@@ -128,6 +128,7 @@ import {
   PreferredEditorEnvironmentRequiredError,
   useOpenInPreferredEditor,
   usePreferredEditor,
+  useSelectableEditors,
 } from "../editorPreferences";
 import { openInEditorMenuLabel } from "../editorLabels";
 import { resolveDiffThemeName, type DiffThemeName } from "../lib/diffRendering";
@@ -2323,7 +2324,7 @@ function useChatMarkdownState({
   );
   const serverConfig = useAtomValue(serverEnvironment.configValueAtom(environmentId));
   const projects = useProjects();
-  const availableEditors = serverConfig?.availableEditors ?? [];
+  const availableEditors = useSelectableEditors(serverConfig);
   const [preferredEditor] = usePreferredEditor(availableEditors);
   const preferredEditorMenuLabel = openInEditorMenuLabel(preferredEditor);
   const openInPreferredEditor = useOpenInPreferredEditor(environmentId, availableEditors);
