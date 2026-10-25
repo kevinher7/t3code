@@ -1,11 +1,6 @@
 /**
- * Editors - Shared helpers for editor identifiers.
- *
- * Maps user-defined custom editor definitions to namespaced `EditorId`
- * values so they can flow through the same RPC/preference plumbing as
- * built-in editors without colliding with built-in ids.
- *
- * @module Editors
+ * Maps user-defined custom editors to namespaced `EditorId`s so they share the
+ * built-in editor RPC and preference paths without colliding with built-in ids.
  */
 import {
   CUSTOM_EDITOR_ID_PREFIX,

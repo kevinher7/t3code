@@ -113,7 +113,7 @@ function SidebarBrand({ onBackdrop, stageLabel }: { onBackdrop: boolean; stageLa
       <SidebarBrandMark onBackdrop={onBackdrop} />
       <span
         className={cn(
-          "sidebar-brand-stage shrink-0 items-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-[0.18em]",
+          "shrink-0 items-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-4xs font-medium uppercase tracking-widest",
           onBackdrop ? "bg-white/15 text-white/70" : "bg-muted/50 text-muted-foreground/60",
         )}
       >

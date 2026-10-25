@@ -54,7 +54,7 @@ import {
   ToastProvider,
   toastManager,
 } from "../components/ui/toast";
-import { useSelectableEditors } from "../editorPreferences";
+import { selectableEditorsForConfig } from "../editorPreferences";
 import { isElectron } from "../env";
 import { cn } from "../lib/utils";
 import { applyAppearanceFontVariables } from "~/appearanceFonts";
@@ -523,7 +523,7 @@ function EventRouter({
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
   const primaryEnvironment = usePrimaryEnvironment();
   const serverConfig = useAtomValue(primaryServerConfigAtom);
-  const selectableEditors = useSelectableEditors(serverConfig);
+  const selectableEditors = selectableEditorsForConfig(serverConfig);
   const serverConfigEvent = useAtomValue(primaryServerConfigEventAtom);
   const serverWelcome = useAtomValue(primaryServerWelcomeAtom);
   const readPathname = useEffectEvent(() => pathname);

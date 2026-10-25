@@ -151,8 +151,8 @@ export const EDITORS = [
 export const BuiltinEditorId = Schema.Literals(EDITORS.map((e) => e.id));
 export type BuiltinEditorId = typeof BuiltinEditorId.Type;
 
-export const MAX_CUSTOM_EDITOR_ID_LENGTH = 32;
-export const MAX_CUSTOM_EDITORS_COUNT = 32;
+const MAX_CUSTOM_EDITOR_ID_LENGTH = 32;
+const MAX_CUSTOM_EDITORS_COUNT = 32;
 
 /**
  * Placeholder replaced with the target path when launching a custom editor.

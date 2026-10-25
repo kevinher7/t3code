@@ -22,7 +22,7 @@ import * as Option from "effect/Option";
 
 import { cn } from "../../lib/utils";
 import { ensureLocalApi } from "../../localApi";
-import { useOpenInPreferredEditor, useSelectableEditors } from "../../editorPreferences";
+import { useOpenInPreferredEditor, selectableEditorsForConfig } from "../../editorPreferences";
 import { useRelativeTimeState } from "../../hooks/useRelativeTimeState";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
@@ -718,7 +718,7 @@ export function DiagnosticsSettingsPanel() {
   const environmentId = environment?.environmentId ?? null;
   const canMaintainEnvironment = useEnvironmentScope(environmentId, AuthEnvironmentMaintainScope);
   const observability = environment?.serverConfig?.observability;
-  const selectableEditors = useSelectableEditors(environment?.serverConfig);
+  const selectableEditors = selectableEditorsForConfig(environment?.serverConfig);
   const canOpenHostEditor = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
   const session = useEnvironmentQuery(
     environmentId === null ? null : environmentSession.sessionStateAtom(environmentId),

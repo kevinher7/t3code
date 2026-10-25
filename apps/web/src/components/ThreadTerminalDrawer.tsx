@@ -57,7 +57,7 @@ import {
   type GhosttyTerminalSurfaceOptions,
 } from "~/terminal/ghostty/surface";
 import { type GhosttyColor, type GhosttyTheme } from "~/terminal/ghostty/core";
-import { useOpenInPreferredEditor, useSelectableEditors } from "../editorPreferences";
+import { useOpenInPreferredEditor, selectableEditorsForConfig } from "../editorPreferences";
 import { resolvePathLinkTarget } from "@t3tools/shared/fileLinks";
 import { isTerminalUrl } from "../terminal-links";
 import {
@@ -479,7 +479,7 @@ function TerminalSessionViewport({
       isTerminalUrl(text) || readEnvironmentScope(environmentId, AuthOrchestrationOperateScope),
   );
   const serverConfig = useAtomValue(serverEnvironment.configValueAtom(environmentId));
-  const selectableEditors = useSelectableEditors(serverConfig);
+  const selectableEditors = selectableEditorsForConfig(serverConfig);
   const openInPreferredEditor = useOpenInPreferredEditor(environmentId, selectableEditors);
   const openTerminalPath = useEffectEvent((target: string) => openInPreferredEditor(target));
   const openPreview = useAtomCommand(previewEnvironment.open, {

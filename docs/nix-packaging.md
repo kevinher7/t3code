@@ -35,7 +35,7 @@ and upstream release artifacts are off the table — everything must come from
   `appimage-run`. It exposes only `packages.x86_64-linux.default`, has **no CLI**
   and **no macOS**. Useful only as a reference for the AppImage-wrapping trick.
 - **The fork has no published GitHub releases** (`gh release list --repo
-kevinher7/t3code` is empty). The local `release/` dir has locally-built mac
+  kevinher7/t3code` is empty). The local `release/` dir has locally-built mac
   arm64 `.dmg`/`.zip`, but those are not fetchable URLs and `release/` is
   gitignored.
 - **The CLI (`apps/server`, package name `t3`, bin → `dist/bin.mjs`) is a Node

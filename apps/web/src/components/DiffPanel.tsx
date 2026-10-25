@@ -23,7 +23,7 @@ import * as DateTime from "effect/DateTime";
 import { useEffect, useRef, useState } from "react";
 import { useCodeViewFileReveal } from "./diffs/useCodeViewFileReveal";
 import { useFilesystemReadAccess } from "~/state/filesystem";
-import { useOpenInPreferredEditor, useSelectableEditors } from "../editorPreferences";
+import { useOpenInPreferredEditor, selectableEditorsForConfig } from "../editorPreferences";
 import { useFileContextMenuHandler } from "../fileContextMenu";
 import { type DraftId } from "../composerDraftStore";
 import { openDiffFilePrimaryAction } from "../diffFileActions";
@@ -238,7 +238,7 @@ export default function DiffPanel({
     serverEnvironment.configValueAtom(activeThread?.environmentId ?? null),
   );
   const onFileContextMenu = useFileContextMenuHandler(activeThread?.environmentId ?? null);
-  const selectableEditors = useSelectableEditors(serverConfig);
+  const selectableEditors = selectableEditorsForConfig(serverConfig);
   const openInPreferredEditor = useOpenInPreferredEditor(
     activeThread?.environmentId ?? null,
     selectableEditors,

@@ -76,13 +76,10 @@ function resolveAndPersistPreferredEditor(
 }
 
 /**
- * Editor ids an environment offers, including its custom editors. Prefer this
- * over reading `availableEditors` directly: that field holds built-in editors
- * only, so a stored `custom:*` preference looks unavailable to callers that
- * skip the merge, and `resolveAndPersistPreferredEditor` then overwrites it
- * with a built-in.
+ * Built-in plus custom editor ids. Use this, not `availableEditors`, or a stored
+ * `custom:*` preference looks unavailable and gets overwritten with a built-in.
  */
-export function useSelectableEditors(
+export function selectableEditorsForConfig(
   config:
     | {
         readonly availableEditors: ServerConfig["availableEditors"];
