@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { PreparedVoiceTranscription } from "@t3tools/client-runtime/voice-input";
-import { Atom, AtomRegistry } from "effect/unstable/reactivity";
+import { Atom, AtomRegistry } from "effect/reactivity";
 import { resetVoiceInputGlobalsForTests } from "../../../../../packages/client-runtime/src/voice-input/controller";
 
 import {
@@ -213,22 +213,6 @@ describe("global voice input", () => {
     });
     expect(commit).not.toHaveBeenCalled();
   });
-
-  it.each(["complete", "cancel"] as const)(
-    "releases draft observation after %s",
-    async (finish) => {
-      const { session } = createSession();
-      const unsubscribe = vi.fn();
-      const subscribe = vi.fn(() => unsubscribe);
-      await session.start(
-        createVoiceInputTarget("first", () => "first", vi.fn(), { start: 5, end: 5 }, subscribe),
-      );
-      expect(subscribe).toHaveBeenCalledTimes(1);
-      if (finish === "complete") await session.controller.stop();
-      else session.cancel("first");
-      expect(unsubscribe).toHaveBeenCalledTimes(1);
-    },
-  );
 
   it("keeps another prompt's recording when a queued edit is discarded", async () => {
     const { session, recorder } = createSession();

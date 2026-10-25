@@ -1,4 +1,11 @@
-import { EDITORS, EditorId, EnvironmentId, type ServerConfig } from "@t3tools/contracts";
+import {
+  AuthOrchestrationOperateScope,
+  EDITORS,
+  EditorId,
+  EnvironmentAuthorizationError,
+  EnvironmentId,
+  type ServerConfig,
+} from "@t3tools/contracts";
 import { selectableEditorIds } from "@t3tools/shared/editors";
 import {
   mapAtomCommandResult,
@@ -7,13 +14,11 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import * as Cause from "effect/Cause";
 import * as Schema from "effect/Schema";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { getLocalStorageItem, setLocalStorageItem, useLocalStorage } from "./hooks/useLocalStorage";
-import { useCallback, useMemo } from "react";
 import { shellEnvironment } from "./state/shell";
 import { useAtomCommand } from "./state/use-atom-command";
-
-export { selectableEditorIds };
+import { readEnvironmentScope } from "./state/session";
 
 const LAST_EDITOR_KEY = "t3code:last-editor";
 
@@ -52,15 +57,15 @@ export class PreferredEditorUnavailableError extends Schema.TaggedError<Preferre
 export function usePreferredEditor(selectableEditors: ReadonlyArray<EditorId>) {
   const [lastEditor, setLastEditor] = useLocalStorage(LAST_EDITOR_KEY, null, EditorId);
 
-  const effectiveEditor = useMemo(() => {
-    if (lastEditor && selectableEditors.includes(lastEditor)) return lastEditor;
-    return fallbackEditor(selectableEditors);
-  }, [lastEditor, selectableEditors]);
+  const effectiveEditor =
+    lastEditor && selectableEditors.includes(lastEditor)
+      ? lastEditor
+      : fallbackEditor(selectableEditors);
 
   return [effectiveEditor, setLastEditor] as const;
 }
 
-export function resolveAndPersistPreferredEditor(
+function resolveAndPersistPreferredEditor(
   selectableEditors: ReadonlyArray<EditorId>,
 ): EditorId | null {
   const stored = getLocalStorageItem(LAST_EDITOR_KEY, EditorId);
@@ -75,18 +80,18 @@ export function resolveAndPersistPreferredEditor(
  * over reading `availableEditors` directly: that field holds built-in editors
  * only, so a stored `custom:*` preference looks unavailable to callers that
  * skip the merge, and `resolveAndPersistPreferredEditor` then overwrites it
- * with a built-in. Memoized because callers pass the result to effect and
- * callback deps.
+ * with a built-in.
  */
 export function useSelectableEditors(
-  config: ServerConfig | null | undefined,
+  config:
+    | {
+        readonly availableEditors: ServerConfig["availableEditors"];
+        readonly settings: Pick<ServerConfig["settings"], "customEditors">;
+      }
+    | null
+    | undefined,
 ): ReadonlyArray<EditorId> {
-  const availableEditors = config?.availableEditors;
-  const customEditors = config?.settings.customEditors;
-  return useMemo(
-    () => selectableEditorIds(availableEditors ?? [], customEditors ?? []),
-    [availableEditors, customEditors],
-  );
+  return selectableEditorIds(config?.availableEditors ?? [], config?.settings.customEditors ?? []);
 }
 
 export function useOpenInPreferredEditor(
@@ -98,47 +103,55 @@ export function useOpenInPreferredEditor(
   });
   type OpenInEditorError = AtomCommandFailure<Awaited<ReturnType<typeof openInEditor>>>;
 
-  return useCallback(
-    async (
-      targetPath: string,
-    ): Promise<
-      AtomCommandResult<
-        EditorId,
-        | OpenInEditorError
-        | PreferredEditorEnvironmentRequiredError
-        | PreferredEditorUnavailableError
-      >
-    > => {
-      if (environmentId === null) {
-        return AsyncResult.failure(
-          Cause.fail(
-            new PreferredEditorEnvironmentRequiredError({
-              targetPath,
-            }),
-          ),
-        );
-      }
-      const editor = resolveAndPersistPreferredEditor(availableEditors);
-      if (!editor) {
-        return AsyncResult.failure(
-          Cause.fail(
-            new PreferredEditorUnavailableError({
-              environmentId,
-              targetPath,
-              availableEditorIds: availableEditors,
-            }),
-          ),
-        );
-      }
-      const result = await openInEditor({
-        environmentId,
-        input: {
-          cwd: targetPath,
-          editor,
-        },
-      });
-      return mapAtomCommandResult(result, () => editor);
-    },
-    [availableEditors, environmentId, openInEditor],
-  );
+  return async (
+    targetPath: string,
+  ): Promise<
+    AtomCommandResult<
+      EditorId,
+      | OpenInEditorError
+      | PreferredEditorEnvironmentRequiredError
+      | PreferredEditorUnavailableError
+      | EnvironmentAuthorizationError
+    >
+  > => {
+    if (environmentId === null) {
+      return AsyncResult.failure(
+        Cause.fail(
+          new PreferredEditorEnvironmentRequiredError({
+            targetPath,
+          }),
+        ),
+      );
+    }
+    if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) {
+      return AsyncResult.failure(
+        Cause.fail(
+          new EnvironmentAuthorizationError({
+            requiredScope: AuthOrchestrationOperateScope,
+            message: "This connection cannot open an editor on this environment.",
+          }),
+        ),
+      );
+    }
+    const editor = resolveAndPersistPreferredEditor(availableEditors);
+    if (!editor) {
+      return AsyncResult.failure(
+        Cause.fail(
+          new PreferredEditorUnavailableError({
+            environmentId,
+            targetPath,
+            availableEditorIds: availableEditors,
+          }),
+        ),
+      );
+    }
+    const result = await openInEditor({
+      environmentId,
+      input: {
+        cwd: targetPath,
+        editor,
+      },
+    });
+    return mapAtomCommandResult(result, () => editor);
+  };
 }

@@ -5,8 +5,8 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Tracer from "effect/Tracer";
-import type { HttpClient } from "effect/unstable/http";
-import { OtlpSerialization, OtlpTracer } from "effect/unstable/observability";
+import type { HttpClient } from "effect/http";
+import { OtlpSerialization, OtlpTracer } from "effect/observability";
 
 export interface RelayClientTracingConfig {
   readonly tracesUrl: string;
@@ -29,6 +29,11 @@ export class RelayClientTracer extends Context.Reference(
   },
 ) {}
 
+class LocalTracer extends Context.Reference("@t3tools/shared/relayTracing/LocalTracer", {
+  defaultValue: () => Option.none<Tracer.Tracer>(),
+}) {}
+
+/** Export only T3 Connect spans; wrap local work with {@link withLocalTracing}. */
 export const withRelayClientTracing = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, R> =>
@@ -36,7 +41,26 @@ export const withRelayClientTracing = <A, E, R>(
     Effect.flatMap(
       Option.match({
         onNone: () => effect,
-        onSome: (tracer) => effect.pipe(Effect.provideService(Tracer.Tracer, tracer)),
+        onSome: (tracer) =>
+          Tracer.Tracer.pipe(
+            Effect.flatMap((local) =>
+              effect.pipe(
+                Effect.provideService(Tracer.Tracer, tracer),
+                Effect.provideService(LocalTracer, Option.some(local)),
+              ),
+            ),
+          ),
+      }),
+    ),
+  );
+
+/** Keep local work in the local trace without exporting machine details through relay spans. */
+export const withLocalTracing = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  LocalTracer.pipe(
+    Effect.flatMap(
+      Option.match({
+        onNone: () => effect,
+        onSome: (local) => effect.pipe(Effect.provideService(Tracer.Tracer, local)),
       }),
     ),
   );
@@ -114,9 +138,7 @@ function nonInterferingTracer(delegate: Tracer.Tracer): Tracer.Tracer {
       span.end = (endTime, exit) => {
         try {
           end(endTime, traceSafeExit(exit));
-        } catch {
-          // Telemetry is best-effort and must never change application behavior.
-        }
+        } catch {}
       };
       return span;
     },
@@ -124,7 +146,7 @@ function nonInterferingTracer(delegate: Tracer.Tracer): Tracer.Tracer {
   });
 }
 
-export function makeRelayClientTracingLayer(
+export function layer(
   config: RelayClientTracingConfig | null,
   resource: RelayClientTracingResource,
 ): Layer.Layer<never, never, HttpClient.HttpClient> {
@@ -132,7 +154,7 @@ export function makeRelayClientTracingLayer(
     return Layer.succeed(RelayClientTracer, Option.none());
   }
 
-  const tracerLayer = OtlpTracer.layer({
+  const layerTracer = OtlpTracer.layer({
     url: config.tracesUrl,
     headers: {
       Authorization: `Bearer ${config.tracesToken}`,
@@ -144,8 +166,8 @@ export function makeRelayClientTracingLayer(
       attributes: {
         "service.namespace": "t3code",
         "service.runtime": resource.runtime,
-        "service.component": resource.component ?? "relay-client",
-        "t3.client.surface": resource.client,
+        "t3code.component": resource.component ?? "relay-client",
+        "t3code.client.surface": resource.client,
       },
     },
   }).pipe(Layer.provide(OtlpSerialization.layerJson));
@@ -153,5 +175,5 @@ export function makeRelayClientTracingLayer(
   return Layer.effect(
     RelayClientTracer,
     Tracer.Tracer.pipe(Effect.map(nonInterferingTracer), Effect.asSome),
-  ).pipe(Layer.provide(tracerLayer));
+  ).pipe(Layer.provide(layerTracer));
 }
