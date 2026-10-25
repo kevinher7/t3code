@@ -171,7 +171,9 @@ jobs:
           # Invoke pnpm *through* corepack instead: it launches the repo's pinned
           # pnpm (the `packageManager` field) directly, bypassing PATH entirely.
           rm -rf cli-deploy
-          corepack pnpm --filter t3 deploy --prod --legacy cli-deploy
+          # The deployed closure skips mobile and dev-only deps, so most workspace
+          # patches go unused and pnpm 12 would fail the deploy.
+          corepack pnpm --filter t3 deploy --prod --legacy --config.allow-unused-patches=true cli-deploy
           tar -czf release/t3code-cli-aarch64-darwin.tar.gz -C cli-deploy \
             node_modules \
             dist \
@@ -229,7 +231,9 @@ jobs:
           # Invoke pnpm *through* corepack instead: it launches the repo's pinned
           # pnpm (the `packageManager` field) directly, bypassing PATH entirely.
           rm -rf cli-deploy
-          corepack pnpm --filter t3 deploy --prod --legacy cli-deploy
+          # The deployed closure skips mobile and dev-only deps, so most workspace
+          # patches go unused and pnpm 12 would fail the deploy.
+          corepack pnpm --filter t3 deploy --prod --legacy --config.allow-unused-patches=true cli-deploy
           tar -czf release/t3code-cli-x86_64-linux.tar.gz -C cli-deploy \
             node_modules \
             dist \
